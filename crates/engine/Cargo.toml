@@ -1,0 +1,21 @@
+[package]
+name = "scribecraft-engine"
+description = "ScribeCraft's dictation job list, folder intake, bookmarks and the session that ties recordings to the transport."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+scribecraft-media.workspace = true
+scribecraft-transport.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+log.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

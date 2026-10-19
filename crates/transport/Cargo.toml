@@ -1,0 +1,19 @@
+[package]
+name = "scribecraft-transport"
+description = "The transcription transport: play/stop with auto-backstep, rewind and fast-forward, constant-pitch speed, volume and channel routing."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+scribecraft-dsp.workspace = true
+scribecraft-media.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

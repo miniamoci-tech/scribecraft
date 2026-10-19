@@ -1,0 +1,19 @@
+ScribeCraft
+Copyright 2026 the ScribeCraft contributors
+Licensed under the MIT License or the Apache License, Version 2.0, at your option.
+
+ScribeCraft is an independent, clean-room project. It is not affiliated with, endorsed by
+or derived from NCH Software. "Express Scribe" is a trademark of its owner and is named
+only to describe compatibility goals.
+
+This product includes third-party software and fonts:
+
+- Symphonia (audio decoding), Mozilla Public License 2.0, https://github.com/pdeljanov/Symphonia
+  Used unmodified as a library; its source is available at the address above.
+- egui / eframe, MIT OR Apache-2.0, https://github.com/emilk/egui
+- cpal, Apache-2.0, https://github.com/RustAudio/cpal
+- hound, Apache-2.0, https://github.com/ruuda/hound
+- rfd, MIT, https://github.com/PolyMeilex/rfd
+- Fonts embedded by egui: Ubuntu Light (Ubuntu Font Licence 1.0), Hack (MIT and Bitstream
+  Vera License), Noto Emoji (SIL OFL 1.1), emoji-icon-font (MIT). Licence texts are in
+  licenses/; details in ATTRIBUTION.toml.

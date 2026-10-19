@@ -1,0 +1,40 @@
+# ScribeCraft asset attribution — the single source of truth (AGENTS.md §1.3).
+# Checked by `cargo xtask assets`.
+#
+# [[asset]]   one entry per asset file committed to this repository (path, sha256 required).
+# [[bundled]] assets that reach the shipped app through a Cargo dependency.
+#
+# The repository currently commits no asset files: test and demo recordings are generated
+# in code (`scribecraft_media::synth`, `scribecraft-cli tone`) and never committed.
+
+[[bundled]]
+title = "Ubuntu Light"
+author = "Dalton Maag Ltd for Canonical"
+source = "https://crates.io/crates/epaint_default_fonts/0.36.2 (fonts/Ubuntu-Light.ttf)"
+license = "Ubuntu-Font-1.0"
+license_file = "licenses/Ubuntu-Font-1.0.txt"
+usage = "Default proportional interface font of egui, embedded in the desktop app binary."
+
+[[bundled]]
+title = "Hack Regular"
+author = "Source Foundry Authors (glyphs derived from DejaVu, public domain, and Bitstream Vera)"
+source = "https://crates.io/crates/epaint_default_fonts/0.36.2 (fonts/Hack-Regular.ttf)"
+license = "MIT AND Bitstream-Vera"
+license_file = "licenses/Hack-MIT-Bitstream-Vera.txt"
+usage = "Default monospace font of egui (time display), embedded in the desktop app binary."
+
+[[bundled]]
+title = "Noto Emoji Regular"
+author = "Google LLC"
+source = "https://crates.io/crates/epaint_default_fonts/0.36.2 (fonts/NotoEmoji-Regular.ttf)"
+license = "OFL-1.1"
+license_file = "licenses/OFL-1.1-NotoEmoji.txt"
+usage = "Fallback glyphs (transport symbols) in egui, embedded in the desktop app binary."
+
+[[bundled]]
+title = "emoji-icon-font"
+author = "John Slegers"
+source = "https://crates.io/crates/epaint_default_fonts/0.36.2 (fonts/emoji-icon-font.ttf)"
+license = "MIT"
+license_file = "licenses/emoji-icon-font-MIT.txt"
+usage = "Fallback icon glyphs in egui, embedded in the desktop app binary."

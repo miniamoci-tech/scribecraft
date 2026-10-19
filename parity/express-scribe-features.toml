@@ -1,0 +1,506 @@
+# ScribeCraft parity checklist vs Express Scribe Pro, from NCH's public product description and
+# help pages, never from the installed program's files. Maintained by hand; validated and reported
+# by `cargo xtask parity`.
+# Status: `shipped` = usable today with at least one cited passing test; `partial` = part exists
+# (notes say what is missing); `planned` = not started; `na` = deliberately out of scope (notes say why).
+# `tools` lists crates/automation/src/tools.rs names; `evidence` lists path::test_fn.
+[schema]
+version = 1
+statuses = ["planned", "partial", "shipped", "na"]
+tiers = ["P0", "P1", "P2", "P3"]
+areas = { A = "playback", B = "formats", C = "control", D = "workflow", E = "integration", F = "platform" }
+
+[[feature]]
+id = "play.variable-speed"
+title = "Variable-speed playback (10 %-400 %)"
+area = "A"
+tier = "P0"
+milestone = "M0"
+status = "shipped"
+tools = ["transport_set_speed"]
+evidence = ["crates/transport/src/tests.rs::render_range_produces_the_slowed_recording", "crates/automation/tests/automation.rs::transcription_workflow_end_to_end"]
+notes = "Slider and tool. Not yet: per-dictation remembered speed, speed steps bound to pedal/hotkeys outside the window."
+
+[[feature]]
+id = "play.constant-pitch"
+title = "Speed changes keep the voice's pitch"
+area = "A"
+tier = "P0"
+milestone = "M0"
+status = "shipped"
+tools = ["transport_render"]
+evidence = ["crates/dsp/src/wsola.rs::slowing_down_keeps_pitch_and_lengthens_duration", "crates/dsp/src/wsola.rs::stereo_channels_stay_aligned", "crates/transport/src/tests.rs::speed_changes_mid_play_are_seamless"]
+notes = "WSOLA, 30 ms frames. Quality not yet compared by listening tests against Express Scribe; very slow speeds (<40 %) sound grainy. A phase-vocoder option is a gap."
+
+[[feature]]
+id = "play.bit-exact-normal"
+title = "Normal speed plays the decoded audio unchanged"
+area = "A"
+tier = "P1"
+milestone = "M0"
+status = "shipped"
+tools = []
+evidence = ["crates/transport/src/tests.rs::normal_speed_is_bit_exact"]
+notes = "Output-device rate conversion is linear interpolation (gap: windowed-sinc)."
+
+[[feature]]
+id = "play.auto-backstep"
+title = "Auto-backstep on stop (0-60 s)"
+area = "A"
+tier = "P0"
+milestone = "M0"
+status = "shipped"
+tools = ["transport_control", "settings_set"]
+evidence = ["crates/transport/src/tests.rs::stop_steps_back_by_the_auto_backstep", "crates/transport/src/tests.rs::backstep_never_goes_before_the_start"]
+notes = "Default 1000 ms is our own choice."
+
+[[feature]]
+id = "play.rewind-ff-hold"
+title = "Rewind and fast-forward while a control is held"
+area = "A"
+tier = "P0"
+milestone = "M0"
+status = "shipped"
+tools = ["transport_control"]
+evidence = ["crates/transport/src/tests.rs::rewind_while_held_then_release_resumes_playing"]
+notes = "Silent scan at 8x (configurable). Not yet: audible scrub while rewinding."
+
+[[feature]]
+id = "play.speed-presets"
+title = "Slow and fast speed presets that toggle"
+area = "A"
+tier = "P0"
+milestone = "M0"
+status = "shipped"
+tools = ["transport_control"]
+evidence = ["crates/transport/src/tests.rs::slow_preset_plays_longer_at_the_same_pitch_and_toggles_back"]
+notes = "Defaults 60 % / 150 % are our own."
+
+[[feature]]
+id = "play.skip"
+title = "Skip back / forward, jump to start / end, go to a time"
+area = "A"
+tier = "P1"
+milestone = "M0"
+status = "shipped"
+tools = ["transport_control", "transport_seek"]
+evidence = ["crates/transport/src/time.rs::formats_and_parses", "crates/transport/src/tests.rs::empty_recording_is_harmless"]
+notes = "Skip length is a setting (5 s); not yet bound to pedals."
+
+[[feature]]
+id = "play.volume"
+title = "Volume control"
+area = "A"
+tier = "P1"
+milestone = "M0"
+status = "shipped"
+tools = ["settings_set"]
+evidence = ["crates/transport/src/tests.rs::channel_modes_and_volume_apply_to_output"]
+notes = "-60..+24 dB with clipping protection. Not yet: automatic gain for quiet dictations."
+
+[[feature]]
+id = "play.channel-control"
+title = "Multi-channel control (left, right, mono mix)"
+area = "A"
+tier = "P1"
+milestone = "M0"
+status = "shipped"
+tools = ["settings_set"]
+evidence = ["crates/transport/src/tests.rs::channel_modes_and_volume_apply_to_output", "crates/dsp/src/channels.rs::routes_channels"]
+notes = "More than two channels map onto the first two outputs."
+
+[[feature]]
+id = "play.resume"
+title = "Resume each dictation where it was left"
+area = "A"
+tier = "P1"
+milestone = "M0"
+status = "shipped"
+tools = ["dictation_open", "dictation_close"]
+evidence = ["crates/engine/src/session.rs::open_resume_bookmark_and_save"]
+notes = "Saved on close, on save and on exit."
+
+[[feature]]
+id = "play.waveform"
+title = "Waveform / position display"
+area = "A"
+tier = "P2"
+milestone = "M2"
+status = "partial"
+tools = []
+evidence = []
+notes = "Seek bar and clock only; no waveform drawing yet."
+
+[[feature]]
+id = "play.noise-reduction"
+title = "Background-noise reduction and voice enhancement"
+area = "A"
+tier = "P2"
+milestone = "M5"
+status = "planned"
+tools = []
+evidence = []
+notes = "Not started; confirm the exact Express Scribe Pro behaviour from public docs first."
+
+[[feature]]
+id = "play.video"
+title = "Video playback window"
+area = "A"
+tier = "P1"
+milestone = "M6"
+status = "planned"
+tools = []
+evidence = []
+notes = "Audio tracks of MP4/MOV/MKV decode (fmt.video-audio); no picture yet."
+
+[[feature]]
+id = "fmt.wav"
+title = "WAV / PCM recordings"
+area = "B"
+tier = "P0"
+milestone = "M0"
+status = "shipped"
+tools = ["media_info"]
+evidence = ["crates/media/src/wav.rs::round_trips_through_wav", "crates/media/tests/decode.rs::a_truncated_recording_decodes_what_is_there", "crates/media/tests/decode.rs::corrupted_wav_never_panics"]
+notes = "PCM and ADPCM through Symphonia; truncated files play what is there. Whole-file decode only."
+
+[[feature]]
+id = "fmt.compressed"
+title = "MP3, FLAC, Ogg Vorbis, AAC/M4A, ALAC, AIFF/AIFC, CAF"
+area = "B"
+tier = "P0"
+milestone = "M1"
+status = "partial"
+tools = ["media_info"]
+evidence = []
+notes = "Decoders compiled in (Symphonia) but no generated-fixture tests yet because the repo has no encoder; whole-file decode only."
+
+[[feature]]
+id = "fmt.video-audio"
+title = "Audio track of 3GP, MP4, M4V, MOV, MKV, WebM"
+area = "B"
+tier = "P1"
+milestone = "M1"
+status = "partial"
+tools = ["media_info"]
+evidence = []
+notes = "Container support compiled in, untested; WMV/AVI/FLV/ASF not supported."
+
+[[feature]]
+id = "fmt.dss"
+title = "DSS / DS2 dictation recorders"
+area = "B"
+tier = "P0"
+milestone = "M1"
+status = "planned"
+tools = []
+evidence = []
+notes = "Most important dictation gap. Proprietary codec: only from a public specification or a user-installed external decoder process (AGENTS.md section 2). Encrypted DS2 also needs the author's password."
+
+[[feature]]
+id = "fmt.wma"
+title = "WMA / ASF"
+area = "B"
+tier = "P1"
+milestone = "M1"
+status = "planned"
+tools = []
+evidence = []
+notes = "No pure-Rust decoder; options: external decoder process, or Media Foundation through a safe wrapper on Windows."
+
+[[feature]]
+id = "fmt.dct"
+title = "DCT dictation files"
+area = "B"
+tier = "P1"
+milestone = "M1"
+status = "planned"
+tools = []
+evidence = []
+notes = "Proprietary; same rule as fmt.dss."
+
+[[feature]]
+id = "fmt.other-dictation"
+title = "AMR, ACT, APE, AU, DVF, MSV, QCP, RA/RM, SHN, SPX, VOC, VOX, TrueSpeech, MPC, MP2"
+area = "B"
+tier = "P2"
+milestone = "M1"
+status = "planned"
+tools = []
+evidence = []
+notes = "AU, VOC, VOX and MP2 are public formats and the easiest next steps."
+
+[[feature]]
+id = "fmt.encrypted"
+title = "Encrypted dictation files"
+area = "B"
+tier = "P2"
+milestone = "M4"
+status = "planned"
+tools = []
+evidence = []
+notes = "Depends on fmt.dss."
+
+[[feature]]
+id = "fmt.cd-audio"
+title = "Load audio CDs"
+area = "B"
+tier = "P3"
+milestone = "M4"
+status = "planned"
+tools = []
+evidence = []
+notes = "Low priority."
+
+[[feature]]
+id = "ctl.hotkeys-window"
+title = "Keyboard control inside the window"
+area = "C"
+tier = "P0"
+milestone = "M2"
+status = "partial"
+tools = []
+evidence = []
+notes = "F9/F7/F8/F5/F6/F10, Ctrl+B, Ctrl+S in the desktop app; checked by hand on Windows 10 on 2026-10-19; no automated UI test; not remappable."
+
+[[feature]]
+id = "ctl.hotkeys-global"
+title = "System-wide hotkeys while typing in another program"
+area = "C"
+tier = "P0"
+milestone = "M3"
+status = "planned"
+tools = []
+evidence = []
+notes = "Essential for real transcription work; planned in crates/platform, opt-in and remappable."
+
+[[feature]]
+id = "ctl.foot-pedal"
+title = "USB foot pedals (Infinity, VEC, Olympus RS27/28/31, Philips, AltoEdge, vDictate)"
+area = "C"
+tier = "P0"
+milestone = "M3"
+status = "planned"
+tools = []
+evidence = []
+notes = "USB HID reports from public descriptors and black-box observation with synthetic input only; learn mode for unknown pedals."
+
+[[feature]]
+id = "ctl.pedal-wizard"
+title = "Pedal setup wizard"
+area = "C"
+tier = "P2"
+milestone = "M3"
+status = "planned"
+tools = []
+evidence = []
+notes = "Not started."
+
+[[feature]]
+id = "ctl.speechmike"
+title = "SpeechMike / dictation controller buttons"
+area = "C"
+tier = "P2"
+milestone = "M3"
+status = "planned"
+tools = []
+evidence = []
+notes = "Not started."
+
+[[feature]]
+id = "job.list"
+title = "Dictation job list, most urgent then oldest first"
+area = "D"
+tier = "P0"
+milestone = "M0"
+status = "shipped"
+tools = ["dictation_add", "dictation_list", "dictation_remove", "jobs_load", "jobs_save"]
+evidence = ["crates/engine/src/jobs.rs::add_save_load_round_trip_and_queue_order", "crates/engine/src/jobs.rs::missing_is_empty_and_corrupt_is_an_error_that_keeps_the_file", "crates/automation/tests/automation.rs::transcription_workflow_end_to_end"]
+notes = "Atomic JSON file; a corrupt file is reported and never overwritten. Not yet: folders/tabs, column sorting, search."
+
+[[feature]]
+id = "job.metadata"
+title = "Author, priority, status, due date and notes per dictation"
+area = "D"
+tier = "P1"
+milestone = "M0"
+status = "shipped"
+tools = ["dictation_update"]
+evidence = ["crates/automation/tests/automation.rs::transcription_workflow_end_to_end"]
+notes = "Free-text due date; no reminders."
+
+[[feature]]
+id = "job.bookmarks"
+title = "Bookmarks within a recording"
+area = "D"
+tier = "P1"
+milestone = "M0"
+status = "shipped"
+tools = ["bookmark_add"]
+evidence = ["crates/engine/src/session.rs::open_resume_bookmark_and_save"]
+notes = "Not yet: edit or delete a bookmark."
+
+[[feature]]
+id = "job.folder-intake"
+title = "Import every new recording in a folder"
+area = "D"
+tier = "P1"
+milestone = "M0"
+status = "shipped"
+tools = ["folder_scan"]
+evidence = ["crates/engine/src/scan.rs::finds_new_supported_files_within_depth", "crates/automation/tests/automation.rs::transcription_workflow_end_to_end"]
+notes = "Manual scan only; see job.folder-watch."
+
+[[feature]]
+id = "job.folder-watch"
+title = "Check folders for new dictations at timed intervals"
+area = "D"
+tier = "P1"
+milestone = "M4"
+status = "planned"
+tools = []
+evidence = []
+notes = "Not started."
+
+[[feature]]
+id = "job.remote-intake"
+title = "Receive dictations by FTP, e-mail or the local network"
+area = "D"
+tier = "P2"
+milestone = "M4"
+status = "planned"
+tools = []
+evidence = []
+notes = "Opt-in per source, configured by the user only (AGENTS.md section 3)."
+
+[[feature]]
+id = "job.dispatch"
+title = "Send finished transcriptions back to the author"
+area = "D"
+tier = "P2"
+milestone = "M4"
+status = "planned"
+tools = []
+evidence = []
+notes = "Opt-in; never automatic."
+
+[[feature]]
+id = "job.recorder-dock"
+title = "Load recordings from docked portable recorders"
+area = "D"
+tier = "P2"
+milestone = "M4"
+status = "planned"
+tools = []
+evidence = []
+notes = "Mass-storage recorders work today through Add folder; vendor dock protocols are not planned."
+
+[[feature]]
+id = "int.timestamp"
+title = "Copy / insert time stamps"
+area = "E"
+tier = "P1"
+milestone = "M0"
+status = "shipped"
+tools = ["timestamp"]
+evidence = ["crates/transport/src/time.rs::formats_and_parses", "crates/automation/tests/automation.rs::transcription_workflow_end_to_end"]
+notes = "F10 copies [hh:mm:ss.t]; not yet typed into the word processor directly (needs ctl.hotkeys-global)."
+
+[[feature]]
+id = "int.word-processor"
+title = "Play in the background while typing in any editor"
+area = "E"
+tier = "P0"
+milestone = "M3"
+status = "planned"
+tools = []
+evidence = []
+notes = "Depends on ctl.hotkeys-global and ctl.foot-pedal."
+
+[[feature]]
+id = "int.speech-recognition"
+title = "Speech-to-text draft"
+area = "E"
+tier = "P3"
+milestone = "M5"
+status = "planned"
+tools = []
+evidence = []
+notes = "Local only and opt-in (a user-installed recogniser process); never uploads audio."
+
+[[feature]]
+id = "int.text-expander"
+title = "Text expander for medical and legal phrases"
+area = "E"
+tier = "P3"
+milestone = "M5"
+status = "na"
+tools = []
+evidence = []
+notes = "FastFox is a separate NCH product; users keep their own expander."
+
+[[feature]]
+id = "auto.headless"
+title = "Every feature scriptable headlessly (CLI run, future MCP)"
+area = "F"
+tier = "P0"
+milestone = "M0"
+status = "shipped"
+tools = ["dictation_open", "transport_advance", "transport_render"]
+evidence = ["crates/automation/tests/automation.rs::transcription_workflow_end_to_end", "crates/automation/tests/automation.rs::paths_outside_the_root_are_refused", "crates/automation/tests/automation.rs::errors_say_what_is_allowed"]
+notes = "The opt-in MCP server is not written yet (M2)."
+
+[[feature]]
+id = "plat.windows"
+title = "Windows 10/11 desktop app"
+area = "F"
+tier = "P0"
+milestone = "M2"
+status = "partial"
+tools = []
+evidence = []
+notes = "Built and used by hand on Windows 10 (2026-10-19); zip from cargo xtask dist; the setup .exe needs Inno Setup (the release workflow installs it); unsigned."
+
+[[feature]]
+id = "plat.macos"
+title = "macOS desktop app and .dmg"
+area = "F"
+tier = "P0"
+milestone = "M2"
+status = "partial"
+tools = []
+evidence = []
+notes = "Universal .app and .dmg built by the release workflow on a macOS runner; not yet run by hand; not notarized."
+
+[[feature]]
+id = "plat.linux"
+title = "Linux desktop app"
+area = "F"
+tier = "P1"
+milestone = "M2"
+status = "partial"
+tools = []
+evidence = []
+notes = "Built by CI; not yet run by hand."
+
+[[feature]]
+id = "plat.freebsd"
+title = "FreeBSD"
+area = "F"
+tier = "P2"
+milestone = "M7"
+status = "planned"
+tools = []
+evidence = []
+notes = "cpal supports OSS; untested."
+
+[[feature]]
+id = "plat.web"
+title = "Web player (WASM)"
+area = "F"
+tier = "P2"
+milestone = "M7"
+status = "planned"
+tools = []
+evidence = []
+notes = "Engine crates build for wasm32 (cargo xtask wasm); no web front end yet."

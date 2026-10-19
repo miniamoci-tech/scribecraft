@@ -1,0 +1,17 @@
+[package]
+name = "scribecraft"
+description = "ScribeCraft: an open-source transcription player with constant-pitch variable speed, a dictation job list and keyboard control."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+scribecraft-ui-egui.workspace = true
+
+[package.metadata.bundle]
+name = "ScribeCraft"
+identifier = "org.storytold.scribecraft"

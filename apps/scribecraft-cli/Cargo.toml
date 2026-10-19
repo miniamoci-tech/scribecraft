@@ -1,0 +1,20 @@
+[package]
+name = "scribecraft-cli"
+description = "ScribeCraft from the command line: inspect, render and play recordings, and drive the engine through automation scripts."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["audio"]
+audio = ["scribecraft-platform/audio"]
+
+[dependencies]
+scribecraft-engine.workspace = true
+scribecraft-automation.workspace = true
+scribecraft-platform.workspace = true
+serde_json.workspace = true

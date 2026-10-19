@@ -1,0 +1,16 @@
+[package]
+name = "scribecraft-automation"
+description = "ScribeCraft's headless tool table: every user-facing feature as a JSON tool, shared by `scribecraft-cli run` and the opt-in MCP server."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+scribecraft-engine.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

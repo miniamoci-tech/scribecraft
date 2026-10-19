@@ -1,0 +1,21 @@
+[package]
+name = "scribecraft-platform"
+description = "Operating-system services for ScribeCraft: audio output today; foot pedals and system-wide hotkeys next (M3)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["audio"]
+# Audio output through cpal (WASAPI, CoreAudio, ALSA/PipeWire, OSS on FreeBSD).
+audio = ["dep:cpal"]
+
+[dependencies]
+scribecraft-engine.workspace = true
+scribecraft-dsp.workspace = true
+thiserror.workspace = true
+cpal = { workspace = true, optional = true }

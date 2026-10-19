@@ -1,0 +1,18 @@
+[package]
+name = "scribecraft-media"
+description = "Decoding dictation and interview recordings to interleaved PCM, WAV export and synthetic test media."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+symphonia.workspace = true
+hound.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

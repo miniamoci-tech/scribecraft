@@ -1,0 +1,11 @@
+*~
+plan/
+/target
+/dist
+/corpus
+/log
+.DS_Store
+/fuzz-out
+# A craft-fonts checkout used as the optional CRAFT_FONTS_DIR build input.
+/craft-fonts
+*.wav.tmp
