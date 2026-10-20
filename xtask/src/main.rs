@@ -77,6 +77,7 @@ const GATED: &[(&str, u8, &str)] = &[
     ("cpal", 5, "OS audio"),
     ("hidapi", 5, "OS HID"),
     ("global-hotkey", 5, "OS hotkeys"),
+    ("serialport", 5, "OS serial ports"),
     ("windows", 5, "OS API"),
     ("windows-sys", 5, "OS API"),
     ("objc2", 5, "OS API"),

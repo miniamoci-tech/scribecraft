@@ -4,7 +4,9 @@
 //! Nothing here touches an audio device or a window; `platform` and `ui-egui` sit above.
 
 mod fsutil;
+pub mod hotkeys;
 mod jobs;
+pub mod pedal;
 mod scan;
 mod session;
 

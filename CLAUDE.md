@@ -19,7 +19,7 @@ ScribeCraft is a clean-room, open-source, Rust-native transcription player targe
   - Never copy GPL/AGPL code. FFmpeg, SoX and similar run only as external oracle processes.
   - See `plan/README.md` §Clean-room and `plan/adr/0001`.
 - **Privacy.** When observing Express Scribe, use synthetic fixtures only. Never capture the dictation list of a real user, e-mail/FTP settings, or real recordings. Never commit Express Scribe outputs or personal data. Dictations are medical/legal material: see `AGENTS.md` §5.
-- **Layering.** Nothing below L6 depends on egui/winit/eframe/rfd; nothing below L5 depends on cpal/hidapi/global-hotkey or any OS API (`plan/architecture.md` §3, `cargo xtask layers`). `dsp` and `media` stay standalone.
+- **Layering.** Nothing below L6 depends on egui/winit/eframe/rfd; nothing below L5 depends on cpal/hidapi/serialport/global-hotkey or any OS API (`plan/architecture.md` §3, `cargo xtask layers`). `dsp` and `media` stay standalone.
 - **Fidelity.** What the listener hears is the model. At 100 % speed playback is bit-exact with the decoded source. Never change the user's media file; the job list and bookmarks are the only things ScribeCraft writes, and it writes them atomically.
 - **Never panic.** Every media file, script, MCP call, settings file, pedal report and keystroke is untrusted input, and none of it may crash the app or lose the user's work. This outranks feature work. Return `Result` (the crate's error enum) and propagate with `?`, or fall back leniently and record it. In non-test code:
   - No `unwrap`/`expect`/`panic!`/`unreachable!`/`todo!` unless it is provably infallible, with a comment saying why.

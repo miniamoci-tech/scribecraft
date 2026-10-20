@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/*", "apps/*", "xtask"]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.95"
@@ -11,13 +11,13 @@ repository = "https://github.com/storytold/scribecraft"
 
 [workspace.dependencies]
 # internal
-scribecraft-dsp = { path = "crates/dsp", version = "0.1.1" }
-scribecraft-media = { path = "crates/media", version = "0.1.1" }
-scribecraft-transport = { path = "crates/transport", version = "0.1.1" }
-scribecraft-engine = { path = "crates/engine", version = "0.1.1" }
-scribecraft-automation = { path = "crates/automation", version = "0.1.1" }
-scribecraft-platform = { path = "crates/platform", version = "0.1.1", default-features = false }
-scribecraft-ui-egui = { path = "crates/ui-egui", version = "0.1.1" }
+scribecraft-dsp = { path = "crates/dsp", version = "0.1.2" }
+scribecraft-media = { path = "crates/media", version = "0.1.2" }
+scribecraft-transport = { path = "crates/transport", version = "0.1.2" }
+scribecraft-engine = { path = "crates/engine", version = "0.1.2" }
+scribecraft-automation = { path = "crates/automation", version = "0.1.2" }
+scribecraft-platform = { path = "crates/platform", version = "0.1.2", default-features = false }
+scribecraft-ui-egui = { path = "crates/ui-egui", version = "0.1.2" }
 
 # media (pure Rust decoders; MPL-2.0, used unmodified as a dependency)
 symphonia = { version = "0.5.4", default-features = false, features = ["wav", "pcm", "adpcm", "mp3", "flac", "vorbis", "ogg", "aac", "isomp4", "aiff", "caf", "alac", "mkv"] }
@@ -32,6 +32,12 @@ log = "0.4"
 
 # platform
 cpal = "0.15"
+# USB HID foot pedals (MIT; bundles the BSD-licensed hidapi C library)
+hidapi = "2.6"
+# COM-port foot pedals (MPL-2.0, used unmodified)
+serialport = "4.10"
+# System-wide hotkeys (Apache-2.0 OR MIT)
+global-hotkey = "0.9"
 
 # ui
 eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow", "accesskit", "wayland", "x11"] }

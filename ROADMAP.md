@@ -7,5 +7,6 @@
 - Milestones: [`docs/roadmap.md`](docs/roadmap.md) · Gaps: [`docs/gaps.md`](docs/gaps.md) · Measurement: [`docs/target-app-parity.md`](docs/target-app-parity.md)
 
 ## Progress log
+- 2026-10-20 — M3: foot pedals on USB (HID, learned with one press) and serial COM ports (NCH public wiring defaults), system-wide hotkeys (F7/F8 hold, F9, F4, F6; remappable) that work while the word processor is in front; `scribecraft-cli pedal list|monitor`; pedal automation tools. Checked by hand on Windows 10; no physical pedal yet.
 - 2026-10-19 — 0.1.1: restored the `cargo xtask` alias (#1); CI green on Windows, macOS and Linux; first packaged release (setup .exe, .dmg, tar.gz) from the release workflow.
 - 2026-10-19 — M0: workspace, WSOLA constant-pitch speed, Symphonia decode with limits, transport (backstep, held rewind/FF, presets), job list with resume and bookmarks, 21 automation tools with `--root` confinement, CLI with real audio output, xtask gates (layers, assets, parity, wasm, ci, dist). M2.0: first desktop window, checked by hand on Windows 10.

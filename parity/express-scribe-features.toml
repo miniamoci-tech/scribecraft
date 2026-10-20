@@ -261,7 +261,7 @@ milestone = "M2"
 status = "partial"
 tools = []
 evidence = []
-notes = "F9/F7/F8/F5/F6/F10, Ctrl+B, Ctrl+S in the desktop app; checked by hand on Windows 10 on 2026-10-19; no automated UI test; not remappable."
+notes = "When system-wide hotkeys are off, the same remappable bindings work inside the window; F10 copy time stamp, Ctrl+B, Ctrl+S always. Checked by hand on Windows 10; no automated UI test."
 
 [[feature]]
 id = "ctl.hotkeys-global"
@@ -269,10 +269,10 @@ title = "System-wide hotkeys while typing in another program"
 area = "C"
 tier = "P0"
 milestone = "M3"
-status = "planned"
+status = "partial"
 tools = []
-evidence = []
-notes = "Essential for real transcription work; planned in crates/platform, opt-in and remappable."
+evidence = ["crates/engine/src/hotkeys.rs::default_keys_play_toggle_and_hold_to_rewind", "crates/platform/src/hotkeys.rs::the_route_can_be_replaced_and_cleared_repeatedly"]
+notes = "On by default: F7 rewind (hold), F8 fast-forward (hold), F9 play/stop, F4 stop, F6 slow, remappable in the Hotkeys window. Checked by hand on Windows 10 on 2026-10-20 (F9 pressed in Notepad starts and stops ScribeCraft in the background). macOS not yet checked by hand; Linux works on X11 only (no Wayland global shortcuts); no automated OS-level test."
 
 [[feature]]
 id = "ctl.foot-pedal"
@@ -280,10 +280,10 @@ title = "USB foot pedals (Infinity, VEC, Olympus RS27/28/31, Philips, AltoEdge, 
 area = "C"
 tier = "P0"
 milestone = "M3"
-status = "planned"
-tools = []
-evidence = []
-notes = "USB HID reports from public descriptors and black-box observation with synthetic input only; learn mode for unknown pedals."
+status = "partial"
+tools = ["pedal_config_set", "pedal_report", "pedal_learn", "pedal_config_get"]
+evidence = ["crates/engine/src/pedal.rs::serial_pedal_hold_to_play_with_backstep_and_rewind_while_held", "crates/engine/src/pedal.rs::learning_finds_the_pressed_bit_including_active_low_pedals", "crates/engine/src/pedal.rs::an_active_low_pedal_can_be_learned_and_used", "crates/automation/tests/automation.rs::serial_foot_pedal_drives_playback_end_to_end", "crates/platform/src/pedal.rs::a_missing_device_reports_waiting_and_stops_promptly", "crates/platform/src/pedal.rs::keyboards_and_mice_are_never_pedals"]
+notes = "USB HID pedals (any model: each pedal is learned with one press; known pedal makers are listed first) and serial COM pedals read from the modem lines with DTR raised, using NCH's public wiring note as the default (pin 1 DCD play, pin 6 DSR rewind, pins 8 CTS / 9 RI fast-forward). Play while held or press to toggle; rewind and fast-forward while held; reconnects after unplugging; works while another program is in front. Not yet: tested with a physical pedal, game-port pedals, a udev rule for HID access on Linux. Keyboards and mice are never listed or opened."
 
 [[feature]]
 id = "ctl.pedal-wizard"
@@ -291,10 +291,10 @@ title = "Pedal setup wizard"
 area = "C"
 tier = "P2"
 milestone = "M3"
-status = "planned"
-tools = []
-evidence = []
-notes = "Not started."
+status = "partial"
+tools = ["pedal_learn"]
+evidence = ["crates/engine/src/pedal.rs::learning_finds_the_pressed_bit_including_active_low_pedals"]
+notes = "The Foot pedal window lists devices, shows each pedal live, and learns a pedal by pressing it; scribecraft-cli pedal list / pedal monitor for diagnosis. Not a step-by-step wizard yet."
 
 [[feature]]
 id = "ctl.speechmike"
@@ -412,10 +412,10 @@ title = "Play in the background while typing in any editor"
 area = "E"
 tier = "P0"
 milestone = "M3"
-status = "planned"
+status = "partial"
 tools = []
 evidence = []
-notes = "Depends on ctl.hotkeys-global and ctl.foot-pedal."
+notes = "Playback can be controlled from the foot pedal and system-wide hotkeys while the word processor has the focus (Windows checked by hand). Not yet: typing time stamps directly into the word processor."
 
 [[feature]]
 id = "int.speech-recognition"

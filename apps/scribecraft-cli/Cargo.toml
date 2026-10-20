@@ -10,8 +10,9 @@ rust-version.workspace = true
 workspace = true
 
 [features]
-default = ["audio"]
+default = ["audio", "pedal"]
 audio = ["scribecraft-platform/audio"]
+pedal = ["scribecraft-platform/pedal"]
 
 [dependencies]
 scribecraft-engine.workspace = true

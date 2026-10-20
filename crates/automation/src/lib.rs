@@ -9,6 +9,7 @@ mod tools;
 
 use std::path::{Component, Path, PathBuf};
 
+use scribecraft_engine::pedal::PedalController;
 use scribecraft_engine::{Session, Settings};
 use serde_json::Value;
 
@@ -33,6 +34,7 @@ impl ToolError {
 pub struct Runner {
     root: PathBuf,
     session: Session,
+    pedal: PedalController,
 }
 
 impl Runner {
@@ -41,7 +43,7 @@ impl Runner {
         let root = std::fs::canonicalize(root)
             .map_err(|e| ToolError::new("runner", format!("the root directory {} cannot be used: {e}", root.display())))?;
         let session = Session::new(Settings::default()).map_err(|e| ToolError::new("runner", e.to_string()))?;
-        Ok(Self { root, session })
+        Ok(Self { root, session, pedal: PedalController::default() })
     }
 
     pub fn session(&self) -> &Session {

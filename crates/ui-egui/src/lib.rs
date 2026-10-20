@@ -3,9 +3,11 @@
 //! One window: the dictation job list on the left, the open dictation on the right with its
 //! transport bar, speed / volume / channel controls, notes and bookmarks.
 //!
-//! Keyboard (while the window has focus; system-wide hotkeys and foot pedals are M3):
-//! F9 play/stop · F7 rewind (hold) · F8 fast-forward (hold) · F5 slow · F6 fast ·
-//! F10 copy time stamp · Ctrl+B bookmark · Ctrl+S save.
+//! Control: a foot pedal (USB or serial) and hotkeys that work system-wide by default
+//! (F7 rewind, F8 fast-forward, F9 play/stop, F4 stop, F6 slow; see `controls`), plus, in the
+//! window, F10 copy time stamp · Ctrl+B bookmark · Ctrl+S save.
+
+mod controls;
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -16,6 +18,8 @@ use scribecraft_engine::transport::{ChannelMode, MAX_SPEED, MIN_SPEED, SpeedPres
 use scribecraft_engine::{Priority, Session, Settings, State, Status, Transport, lock_transport, media, scan_folder};
 use scribecraft_platform::AudioOutput;
 
+use controls::Controls;
+
 /// Opens the main window; `files` are recordings to add and open (from the command line or
 /// the operating system's "Open with").
 pub fn run(files: Vec<PathBuf>) -> Result<(), String> {
@@ -23,7 +27,7 @@ pub fn run(files: Vec<PathBuf>) -> Result<(), String> {
         viewport: egui::ViewportBuilder::default().with_title("ScribeCraft").with_inner_size([1100.0, 700.0]).with_min_inner_size([640.0, 420.0]),
         ..Default::default()
     };
-    eframe::run_native("ScribeCraft", options, Box::new(move |_cc| Ok(Box::new(App::new(files))))).map_err(|e| e.to_string())
+    eframe::run_native("ScribeCraft", options, Box::new(move |cc| Ok(Box::new(App::new(cc.egui_ctx.clone(), files))))).map_err(|e| e.to_string())
 }
 
 struct App {
@@ -34,10 +38,11 @@ struct App {
     message: Option<(String, bool)>,
     bookmark_label: String,
     scrub: Option<f64>,
+    controls: Controls,
 }
 
 impl App {
-    fn new(files: Vec<PathBuf>) -> Self {
+    fn new(ctx: egui::Context, files: Vec<PathBuf>) -> Self {
         let dir = scribecraft_platform::data_dir();
         let mut message = None;
         if let Some(d) = &dir
@@ -59,7 +64,8 @@ impl App {
             },
             None => Session::new(settings.clone()).unwrap_or_default(),
         };
-        let mut app = Self { session, settings_path, output: None, transport: None, message, bookmark_label: String::new(), scrub: None };
+        let controls = Controls::new(ctx, dir.clone());
+        let mut app = Self { session, settings_path, output: None, transport: None, message, bookmark_label: String::new(), scrub: None, controls };
         let mut last = None;
         for f in files {
             last = app.add_file(&f).or(last);
@@ -97,12 +103,14 @@ impl App {
         // Stop the old stream before the old transport goes away.
         self.output = None;
         self.transport = None;
+        self.controls.set_transport(None);
         match self.session.open(id) {
             Ok(t) => {
                 match AudioOutput::open(t.clone()) {
                     Ok(o) => self.output = Some(o),
                     Err(e) => self.report(Err(e.to_string())),
                 }
+                self.controls.set_transport(Some(t.clone()));
                 self.transport = Some(t);
                 self.save();
             }
@@ -147,42 +155,30 @@ impl App {
 
     fn keyboard(&mut self, ctx: &egui::Context) {
         use egui::Key;
-        let (pressed, released, ctrl) = ctx.input(|i| {
-            let mut pressed = Vec::new();
-            let mut released = Vec::new();
-            for e in &i.events {
-                if let egui::Event::Key { key, pressed: down, repeat: false, .. } = e {
-                    if *down { pressed.push(*key) } else { released.push(*key) }
-                }
-            }
-            (pressed, released, i.modifiers.command)
+        let events: Vec<(Key, bool, egui::Modifiers)> = ctx.input(|i| {
+            i.events
+                .iter()
+                .filter_map(|e| match e {
+                    egui::Event::Key { key, pressed, repeat: false, modifiers, .. } => Some((*key, *pressed, *modifiers)),
+                    _ => None,
+                })
+                .collect()
         });
-        for key in pressed {
-            match (key, ctrl) {
-                (Key::F9, _) => {
-                    self.with_transport(Transport::toggle_play);
-                }
-                (Key::F7, _) => {
-                    self.with_transport(Transport::rewind);
-                }
-                (Key::F8, _) => {
-                    self.with_transport(Transport::fast_forward);
-                }
-                (Key::F5, _) => {
-                    self.with_transport(Transport::toggle_slow);
-                }
-                (Key::F6, _) => {
-                    self.with_transport(Transport::toggle_fast);
-                }
+        for (key, pressed, modifiers) in events {
+            // Transport keys: handled here only when they are not registered system-wide
+            // (then the system delivers them to the hotkey handler instead).
+            if let Some(action) = self.controls.window_action(key, modifiers) {
+                self.with_transport(|t| scribecraft_engine::hotkeys::apply_hotkey(action, pressed, t));
+                continue;
+            }
+            if !pressed {
+                continue;
+            }
+            match (key, modifiers.command) {
                 (Key::F10, _) => self.copy_timestamp(ctx),
                 (Key::B, true) => self.bookmark(),
                 (Key::S, true) => self.save(),
                 _ => {}
-            }
-        }
-        for key in released {
-            if matches!(key, Key::F7 | Key::F8) {
-                self.with_transport(Transport::release);
             }
         }
     }
@@ -233,8 +229,14 @@ impl App {
             if ui.button("Save").on_hover_text("Ctrl+S").clicked() {
                 self.save();
             }
+            if ui.button("Foot pedal…").clicked() {
+                self.controls.pedal_open = true;
+            }
+            if ui.button("Hotkeys…").clicked() {
+                self.controls.hotkeys_open = true;
+            }
             ui.separator();
-            ui.weak("F9 play/stop · F7/F8 hold to rewind/forward · F5 slow · F6 fast · F10 copy time · Ctrl+B bookmark");
+            ui.weak(format!("{} · F10 copy time · Ctrl+B bookmark", self.controls.key_hint()));
         });
     }
 
@@ -456,12 +458,17 @@ impl eframe::App for App {
         self.keyboard(ctx);
         egui::Panel::top("toolbar").show(root, |ui| self.toolbar(ui));
         egui::Panel::bottom("status").show(root, |ui| {
-            match &self.message {
-                Some((m, true)) => ui.colored_label(ui.visuals().error_fg_color, m),
-                Some((m, false)) => ui.label(m),
-                None => ui.weak(if self.session.is_dirty() { "unsaved changes" } else { "ready" }),
-            };
+            ui.horizontal(|ui| {
+                match &self.message {
+                    Some((m, true)) => ui.colored_label(ui.visuals().error_fg_color, m),
+                    Some((m, false)) => ui.label(m),
+                    None => ui.weak(if self.session.is_dirty() { "unsaved changes" } else { "ready" }),
+                };
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| ui.weak(self.controls.status()));
+            });
         });
+        self.controls.pedal_window(ctx);
+        self.controls.hotkeys_window(ctx);
         egui::Panel::left("jobs").resizable(true).default_size(300.0).show(root, |ui| self.job_list(ui));
         egui::CentralPanel::default().show(root, |ui| {
             self.transport_bar(ui);
@@ -476,6 +483,7 @@ impl eframe::App for App {
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.controls.set_transport(None);
         self.output = None;
         self.session.close();
         let _ = self.session.save();

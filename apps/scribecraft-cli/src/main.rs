@@ -21,6 +21,8 @@ USAGE:
   scribecraft-cli tone --out <out.wav> [--seconds N]
   scribecraft-cli run --script <steps.json> --root <dir>
   scribecraft-cli tools
+  scribecraft-cli pedal list
+  scribecraft-cli pedal monitor <number from list | COM3 | /dev/ttyUSB0> [--seconds N]
 
 TIME is ss, mm:ss or hh:mm:ss (optionally .fraction). S is 0.1..=4.0 (1 = normal speed).
 While playing, type a key and press Enter:
@@ -96,6 +98,7 @@ fn run(args: &[String]) -> Result<(), String> {
         "render" => render(&opts),
         "tone" => tone(&opts),
         "run" => script(&opts),
+        "pedal" => pedal(&opts),
         "tools" => {
             for t in TOOLS {
                 println!("{:<22} {}", t.name, t.summary);
@@ -224,4 +227,76 @@ fn play(opts: &Opts) -> Result<(), String> {
     }
     drop(output);
     Ok(())
+}
+
+#[cfg(not(feature = "pedal"))]
+fn pedal(_: &Opts) -> Result<(), String> {
+    Err("this build has no foot pedal support (built without the \"pedal\" feature)".into())
+}
+
+/// `pedal list` shows the devices a pedal may be; `pedal monitor` prints what one sends,
+/// so a user can see which device is the pedal and which bit each pedal sets.
+#[cfg(feature = "pedal")]
+fn pedal(opts: &Opts) -> Result<(), String> {
+    use scribecraft_engine::pedal::{PedalSource, SERIAL_CTS, SERIAL_DCD, SERIAL_DSR, SERIAL_RI};
+    use scribecraft_platform::pedal::{PedalReader, ReaderStatus, list_devices};
+    let devices = list_devices();
+    match opts.positional.first().copied() {
+        Some("list") => {
+            if devices.is_empty() {
+                println!("no USB HID devices (other than keyboards and mice) or serial ports found");
+            }
+            for (i, d) in devices.iter().enumerate() {
+                println!("{:>3}  {}{}", i + 1, d.label, if d.likely_pedal { "   <- known pedal maker" } else { "" });
+            }
+            Ok(())
+        }
+        Some("monitor") => {
+            let which = opts.positional.get(1).copied().ok_or("pedal monitor needs a device: a number from `pedal list`, or a serial port name")?;
+            let source = match which.parse::<usize>() {
+                Ok(n) => {
+                    devices.get(n.wrapping_sub(1)).map(|d| d.source.clone()).ok_or_else(|| format!("there is no device {n}; run `pedal list`"))?
+                }
+                Err(_) => PedalSource::Serial { port: which.to_owned() },
+            };
+            let serial = matches!(source, PedalSource::Serial { .. });
+            let reader = PedalReader::start(&source, move |report| {
+                if serial {
+                    let b = report.first().copied().unwrap_or(0);
+                    let on = |m: u8, name: &str| if b & m != 0 { format!(" {name}") } else { String::new() };
+                    println!(
+                        "lines:{}{}{}{}",
+                        on(SERIAL_DCD, "DCD(pin1)"),
+                        on(SERIAL_DSR, "DSR(pin6)"),
+                        on(SERIAL_CTS, "CTS(pin8)"),
+                        on(SERIAL_RI, "RI(pin9)")
+                    );
+                } else {
+                    println!("report: {report:02x?}");
+                }
+            })
+            .map_err(|e| e.to_string())?;
+            println!("press the pedals (Ctrl+C to stop)");
+            let limit = opts.seconds()?.map(Duration::from_secs_f64);
+            let started = std::time::Instant::now();
+            let mut last = None;
+            while limit.is_none_or(|l| started.elapsed() < l) {
+                let status = reader.status();
+                if last.as_ref() != Some(&status) {
+                    match &status {
+                        ReaderStatus::Waiting(why) => eprintln!("{why}"),
+                        s => eprintln!("{s:?}"),
+                    }
+                    last = Some(status);
+                }
+                std::thread::sleep(Duration::from_millis(200));
+            }
+            Ok(())
+        }
+        _ => Err(format!(
+            "usage: scribecraft-cli pedal list | pedal monitor <device>
+
+{USAGE}"
+        )),
+    }
 }
