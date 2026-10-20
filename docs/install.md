@@ -49,10 +49,14 @@ the dictations you have to transcribe, and lets you control playback from the ke
   whole folder. Click a dictation to open it; ScribeCraft remembers where you stopped.
 - **Hotkeys work everywhere**, also while you type in Word or any other program:
   **F9** play/stop · **F7** / **F8** hold to rewind / fast-forward · **F4** stop · **F6** slow.
-  Change them, or limit them to the ScribeCraft window, with **Hotkeys…**. In the window also
+  To change them open **Pedal and keys… → Keys**: every function (play/stop, play, stop,
+  rewind, fast-forward, skip back/forward, slow, fast) has its key; click **Assign…** and
+  press the key or combination you want. Function keys work alone; other keys need Ctrl or
+  Alt so they never stop you typing. (Avoid Ctrl+Alt+letter on keyboards where it is AltGr
+  and types a character.) The checkbox there limits the keys to the ScribeCraft window. In the window also
   **F10** copies the time stamp (`[00:01:23.4]`), **Ctrl+B** adds a bookmark, **Ctrl+S** saves.
   (Linux: system-wide hotkeys need an X11 session; on Wayland they work in the window only.)
-- **Foot pedal** (USB or serial/COM port): plug it in, click **Foot pedal…**, pick the device
+- **Foot pedal** (USB or serial/COM port): plug it in, open **Pedal and keys… → Foot pedal**, pick the device
   (known pedal makers are marked ★), then for each pedal click **Learn a new pedal**, press
   that pedal, and choose what it does (rewind, play, fast-forward…). A serial pedal wired the
   standard way works at once: pin 1 play, pin 6 rewind, pins 8/9 fast-forward. "Plays while

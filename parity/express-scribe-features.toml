@@ -272,7 +272,7 @@ milestone = "M3"
 status = "partial"
 tools = []
 evidence = ["crates/engine/src/hotkeys.rs::default_keys_play_toggle_and_hold_to_rewind", "crates/platform/src/hotkeys.rs::the_route_can_be_replaced_and_cleared_repeatedly"]
-notes = "On by default: F7 rewind (hold), F8 fast-forward (hold), F9 play/stop, F4 stop, F6 slow, remappable in the Hotkeys window. Checked by hand on Windows 10 on 2026-10-20 (F9 pressed in Notepad starts and stops ScribeCraft in the background). macOS not yet checked by hand; Linux works on X11 only (no Wayland global shortcuts); no automated OS-level test."
+notes = "On by default: F7 rewind (hold), F8 fast-forward (hold), F9 play/stop, F4 stop, F6 slow, each function reassigned by pressing the new key in Pedal and keys > Keys. Checked by hand on Windows 10 on 2026-10-20 (F9 pressed in Notepad starts and stops ScribeCraft in the background). macOS not yet checked by hand; Linux works on X11 only (no Wayland global shortcuts); no automated OS-level test."
 
 [[feature]]
 id = "ctl.foot-pedal"
@@ -294,7 +294,7 @@ milestone = "M3"
 status = "partial"
 tools = ["pedal_learn"]
 evidence = ["crates/engine/src/pedal.rs::learning_finds_the_pressed_bit_including_active_low_pedals"]
-notes = "The Foot pedal window lists devices, shows each pedal live, and learns a pedal by pressing it; scribecraft-cli pedal list / pedal monitor for diagnosis. Not a step-by-step wizard yet."
+notes = "The Pedal and keys window lists devices, shows each pedal live, learns a pedal by pressing it and sets its function; scribecraft-cli pedal list / pedal monitor for diagnosis. Not a step-by-step wizard yet."
 
 [[feature]]
 id = "ctl.speechmike"

@@ -164,6 +164,10 @@ impl App {
                 })
                 .collect()
         });
+        if self.controls.capturing() {
+            // The Pedal and keys window is waiting for a key to assign.
+            return;
+        }
         for (key, pressed, modifiers) in events {
             // Transport keys: handled here only when they are not registered system-wide
             // (then the system delivers them to the hotkey handler instead).
@@ -229,11 +233,8 @@ impl App {
             if ui.button("Save").on_hover_text("Ctrl+S").clicked() {
                 self.save();
             }
-            if ui.button("Foot pedal…").clicked() {
-                self.controls.pedal_open = true;
-            }
-            if ui.button("Hotkeys…").clicked() {
-                self.controls.hotkeys_open = true;
+            if ui.button("Pedal and keys…").clicked() {
+                self.controls.open = true;
             }
             ui.separator();
             ui.weak(format!("{} · F10 copy time · Ctrl+B bookmark", self.controls.key_hint()));
@@ -467,8 +468,7 @@ impl eframe::App for App {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| ui.weak(self.controls.status()));
             });
         });
-        self.controls.pedal_window(ctx);
-        self.controls.hotkeys_window(ctx);
+        self.controls.window(ctx);
         egui::Panel::left("jobs").resizable(true).default_size(300.0).show(root, |ui| self.job_list(ui));
         egui::CentralPanel::default().show(root, |ui| {
             self.transport_bar(ui);
