@@ -1,6 +1,6 @@
 [package]
 name = "scribecraft-platform"
-description = "Operating-system services for ScribeCraft: audio output today; foot pedals and system-wide hotkeys next (M3)."
+description = "Operating-system services for ScribeCraft: audio output, USB and serial foot pedals, system-wide hotkeys."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,12 +10,19 @@ rust-version.workspace = true
 workspace = true
 
 [features]
-default = ["audio"]
+default = ["audio", "pedal", "hotkeys"]
 # Audio output through cpal (WASAPI, CoreAudio, ALSA/PipeWire, OSS on FreeBSD).
 audio = ["dep:cpal"]
+# Foot pedals on USB (HID) and serial (COM) ports.
+pedal = ["dep:hidapi", "dep:serialport"]
+# System-wide hotkeys (Windows, macOS, Linux on X11).
+hotkeys = ["dep:global-hotkey"]
 
 [dependencies]
 scribecraft-engine.workspace = true
 scribecraft-dsp.workspace = true
 thiserror.workspace = true
 cpal = { workspace = true, optional = true }
+hidapi = { workspace = true, optional = true }
+serialport = { workspace = true, optional = true }
+global-hotkey = { workspace = true, optional = true }

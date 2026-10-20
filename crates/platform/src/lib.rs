@@ -1,7 +1,8 @@
 //! Operating-system services (layer L5). The only crate below the UI that talks to devices.
 //!
 //! - [`AudioOutput`]: plays a shared [`Transport`] on the default output device.
-//! - Foot pedals (USB HID) and system-wide hotkeys are milestone M3 (`plan/execution-plan.md`).
+//! - [`pedal`]: USB HID and serial (COM) foot pedal readers.
+//! - [`hotkeys`]: system-wide hotkeys that work while another program has the focus.
 
 use std::sync::{Arc, Mutex};
 
@@ -24,6 +25,12 @@ mod audio;
 #[cfg(feature = "audio")]
 pub use audio::AudioOutput;
 
+#[cfg(feature = "pedal")]
+pub mod pedal;
+
+#[cfg(feature = "hotkeys")]
+pub mod hotkeys;
+
 /// Without the `audio` feature, opening an output is a clear error.
 #[cfg(not(feature = "audio"))]
 #[derive(Debug)]
@@ -33,6 +40,11 @@ pub struct AudioOutput;
 impl AudioOutput {
     pub fn open(_transport: Arc<Mutex<Transport>>) -> Result<Self, PlatformError> {
         Err(PlatformError::NoAudioSupport)
+    }
+
+    /// Same surface as the real output; never reached because `open` always fails.
+    pub fn device_name(&self) -> &str {
+        ""
     }
 }
 

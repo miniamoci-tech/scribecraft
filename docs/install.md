@@ -1,6 +1,6 @@
 # Installing and starting ScribeCraft
 
-> **Status:** M0/M1 preview · **Last updated:** 2026-10-19
+> **Status:** 0.1.2 preview · **Last updated:** 2026-10-20
 
 ScribeCraft is an open-source transcription player: it plays recordings slower or faster
 without changing the voice's pitch, steps back a little every time you stop, keeps a list of
@@ -34,7 +34,7 @@ the dictations you have to transcribe, and lets you control playback from the ke
 
 1. Install Rust from <https://rustup.rs> (on Windows also the "Desktop development with C++"
    workload of Visual Studio Build Tools; on Linux `libasound2-dev`, `libgtk-3-dev`,
-   `libxkbcommon-dev`).
+   `libxkbcommon-dev`, `libudev-dev`).
 2. In the source folder run: `cargo run --release -p scribecraft`
 3. To make the packages: `cargo xtask dist` (on Windows, install Inno Setup 6 first to also
    get the setup `.exe`; on macOS it produces the `.dmg`).
@@ -47,14 +47,29 @@ the dictations you have to transcribe, and lets you control playback from the ke
 
 - **Add recordings…** or drop audio/video files on the window; **Add folder…** imports a
   whole folder. Click a dictation to open it; ScribeCraft remembers where you stopped.
-- Keys (while the ScribeCraft window is focused): **F9** play/stop · **F7** / **F8** hold to
-  rewind / fast-forward · **F5** slow · **F6** fast · **F10** copy the time stamp
-  (`[00:01:23.4]`) to paste into your document · **Ctrl+B** bookmark · **Ctrl+S** save.
+- **Hotkeys work everywhere**, also while you type in Word or any other program:
+  **F9** play/stop · **F7** / **F8** hold to rewind / fast-forward · **F4** stop · **F6** slow.
+  To change them open **Pedal and keys… → Keys**: every function (play/stop, play, stop,
+  rewind, fast-forward, skip back/forward, slow, fast) has its key; click **Assign…** and
+  press the key or combination you want. Function keys work alone; other keys need Ctrl or
+  Alt so they never stop you typing. (Avoid Ctrl+Alt+letter on keyboards where it is AltGr
+  and types a character.) The checkbox there limits the keys to the ScribeCraft window. In the window also
+  **F10** copies the time stamp (`[00:01:23.4]`), **Ctrl+B** adds a bookmark, **Ctrl+S** saves.
+  (Linux: system-wide hotkeys need an X11 session; on Wayland they work in the window only.)
+- **Foot pedal** (USB or serial/COM port): plug it in, open **Pedal and keys… → Foot pedal**, pick the device
+  (known pedal makers are marked ★), then for each pedal click **Learn a new pedal**, press
+  that pedal, and choose what it does (rewind, play, fast-forward…). A serial pedal wired the
+  standard way works at once: pin 1 play, pin 6 rewind, pins 8/9 fast-forward. "Plays while
+  held" stops (with the auto-backstep) when you lift your foot. The pedal also works while
+  another program is in front.
+  To find which device is the pedal: `scribecraft-cli pedal list`, then
+  `scribecraft-cli pedal monitor <number>` and press the pedals.
+  Linux: reading a USB pedal may need a udev rule giving your user access to `/dev/hidraw*`.
 - Speed 10 %–400 % without pitch change; auto-backstep, slow/fast presets, volume and
   left/right/mono channel selection are in the second row.
 
-Not yet available (see `docs/gaps.md`): foot pedals, hotkeys that work while you type in
-another program, DSS/DS2/WMA dictation formats, e-mail/FTP intake.
+Not yet available (see `docs/gaps.md`): game-port pedals, typing time stamps straight into
+the word processor, DSS/DS2/WMA dictation formats, e-mail/FTP intake.
 
 ## Where your data is
 

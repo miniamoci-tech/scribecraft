@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use scribecraft_engine::media::{Limits, WavFormat, decode_file, synth, write_wav};
+use scribecraft_engine::pedal::{MAX_REPORT_BYTES, PedalConfig};
 use scribecraft_engine::transport::{format_timestamp, parse_time};
 use scribecraft_engine::{Dictation, MAX_TEXT_CHARS, Priority, Session, Settings, State, Status, Transport, lock_transport, scan_folder};
 use serde_json::{Value, json};
@@ -52,6 +53,18 @@ pub const TOOLS: &[Tool] = &[
     Tool { name: "settings_set", summary: "Change any playback settings (same fields as settings_get)", run: settings_set },
     Tool { name: "bookmark_add", summary: "Bookmark the current position of the open dictation [label]", run: bookmark_add },
     Tool { name: "timestamp", summary: "Time stamp text for the current position or {ms} [tenths=true]", run: timestamp },
+    Tool { name: "pedal_config_get", summary: "The foot pedal configuration (source, buttons, play_mode)", run: pedal_config_get },
+    Tool {
+        name: "pedal_config_set",
+        summary: "Replace the pedal configuration: {config} object, or {serial_port} for the standard serial wiring",
+        run: pedal_config_set,
+    },
+    Tool {
+        name: "pedal_report",
+        summary: "Feed one raw pedal report {bytes:[..]} (HID bytes, or the serial line byte) to the open dictation",
+        run: pedal_report,
+    },
+    Tool { name: "pedal_learn", summary: "Learn pedal {button}: the next pedal_report that presses a new bit assigns it", run: pedal_learn },
     Tool { name: "synth_dictation", summary: "Write a synthetic test recording to {out} [seconds=10, rate=16000, channels=2]", run: synth_dictation },
 ];
 
@@ -366,4 +379,50 @@ fn synth_dictation(r: &mut Runner, a: &Value) -> Result<Value, String> {
     let audio = synth::dictation(rate, channels, seconds);
     write_wav(&out, &audio, WavFormat::Pcm16).map_err(err)?;
     Ok(json!({ "out": r.display(&out), "duration_ms": audio.duration_ms(), "sample_rate": audio.sample_rate, "channels": audio.channels }))
+}
+
+fn pedal_json(r: &Runner) -> Result<Value, String> {
+    serde_json::to_value(r.pedal.config()).map_err(err)
+}
+
+fn pedal_config_get(r: &mut Runner, _: &Value) -> Result<Value, String> {
+    pedal_json(r)
+}
+
+fn pedal_config_set(r: &mut Runner, a: &Value) -> Result<Value, String> {
+    let cfg = match (a.get("config"), args::opt_str(a, "serial_port")?) {
+        (Some(c), None) => serde_json::from_value::<PedalConfig>(c.clone()).map_err(|e| format!("invalid pedal configuration: {e}"))?,
+        (None, Some(port)) => PedalConfig::serial_default(port),
+        _ => return Err("give exactly one of \"config\" or \"serial_port\"".into()),
+    };
+    r.pedal.set_config(cfg).map_err(err)?;
+    pedal_json(r)
+}
+
+fn pedal_report(r: &mut Runner, a: &Value) -> Result<Value, String> {
+    let bytes = a.get("bytes").and_then(Value::as_array).ok_or("missing required argument \"bytes\" (array of 0..=255)")?;
+    if bytes.len() > MAX_REPORT_BYTES {
+        return Err(format!("a report has at most {MAX_REPORT_BYTES} bytes"));
+    }
+    let report: Vec<u8> = bytes
+        .iter()
+        .map(|b| b.as_u64().and_then(|v| u8::try_from(v).ok()).ok_or_else(|| format!("{b} is not a byte (0..=255)")))
+        .collect::<Result<_, _>>()?;
+    let transport = r.session.transport().ok();
+    let feed = match &transport {
+        Some(t) => r.pedal.feed(&report, Some(&mut lock_transport(t))),
+        None => r.pedal.feed(&report, None),
+    };
+    let events: Vec<Value> = feed.events.iter().map(|e| json!({ "button": e.button, "pressed": e.pressed, "action": e.action })).collect();
+    let mut out = json!({ "events": events, "learned": feed.learned.map(|(i, bit)| json!({ "button": i, "bit": bit })) });
+    if let (Some(t), Some(o)) = (&transport, out.as_object_mut()) {
+        o.insert("transport".into(), status_json(&lock_transport(t)));
+    }
+    Ok(out)
+}
+
+fn pedal_learn(r: &mut Runner, a: &Value) -> Result<Value, String> {
+    let button = usize::try_from(args::u64(a, "button")?).map_err(err)?;
+    r.pedal.start_learning(button).map_err(err)?;
+    Ok(json!({ "learning": button, "next": "send a pedal_report with that pedal pressed" }))
 }

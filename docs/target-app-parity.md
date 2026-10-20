@@ -1,6 +1,6 @@
 # Target-app parity: how it is measured
 
-> **Status:** current · **Last updated:** 2026-10-19 · **Target:** Express Scribe Pro (public feature description, v5.x)
+> **Status:** current · **Last updated:** 2026-10-20 · **Target:** Express Scribe Pro (public feature description, v5.x)
 
 - The checklist is `parity/express-scribe-features.toml`, built from NCH's public product page
   and help pages only (ADR 0001). `cargo xtask parity` validates it and prints the numbers;
@@ -23,4 +23,5 @@ Weighted: (8·3 + 9·2) / (16·3 + 15·2 + 11 + 1.5) = 42 / 90.5 ≈ **46 %** �
 "ready for real work" estimate is lower, about **25 %**.
 
 ## Revision history
+- 2026-10-20 — foot pedal, pedal setup, system-wide hotkeys and word-processor control move from planned to partial (no physical-pedal or macOS/Linux hand checks yet); shipped count unchanged.
 - 2026-10-19 — first measurement.

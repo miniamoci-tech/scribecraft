@@ -114,6 +114,7 @@ Dictations are often medical, legal or HR recordings. Beyond §1 and §2:
 - Never log audio content, transcripts, file names of user dictations or job metadata at `info` level or above.
 - Never send dictations, transcripts or job lists anywhere unless the user configured that destination.
 - Crash reports and diagnostics contain no file paths under the user's home and no job metadata.
+- Foot pedal readers never list or open keyboards or mice, and system-wide hotkeys register only the keys the user bound: ScribeCraft must never be able to record typing.
 
 ## 6. Everything else
 

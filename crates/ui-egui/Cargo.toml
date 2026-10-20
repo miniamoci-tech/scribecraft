@@ -11,7 +11,7 @@ workspace = true
 
 [dependencies]
 scribecraft-engine.workspace = true
-scribecraft-platform = { workspace = true, features = ["audio"] }
+scribecraft-platform = { workspace = true, features = ["audio", "pedal", "hotkeys"] }
 eframe.workspace = true
 rfd.workspace = true
 serde_json.workspace = true

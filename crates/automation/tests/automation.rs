@@ -119,6 +119,47 @@ fn errors_say_what_is_allowed() {
 }
 
 #[test]
+fn serial_foot_pedal_drives_playback_end_to_end() {
+    let dir = root("pedal");
+    let mut r = Runner::new(&dir).unwrap();
+    call(&mut r, "synth_dictation", json!({ "out": "d.wav", "seconds": 10, "rate": 8000 }));
+    let id = call(&mut r, "dictation_add", json!({ "path": "d.wav" }))["id"].as_u64().unwrap();
+    call(&mut r, "dictation_open", json!({ "id": id }));
+    call(&mut r, "pedal_config_set", json!({ "serial_port": "COM3" }));
+    // Bits: DCD 1 = play, DSR 2 = rewind, CTS 4 = fast-forward.
+    let down = call(&mut r, "pedal_report", json!({ "bytes": [1] }));
+    assert_eq!(down["events"][0]["action"], "play");
+    assert_eq!(down["transport"]["state"], "playing");
+    call(&mut r, "transport_advance", json!({ "ms": 4000 }));
+    let up = call(&mut r, "pedal_report", json!({ "bytes": [0] }));
+    assert_eq!((up["transport"]["state"].as_str(), up["transport"]["position_ms"].as_u64()), (Some("stopped"), Some(3000)));
+    let rew = call(&mut r, "pedal_report", json!({ "bytes": [2] }));
+    assert_eq!(rew["transport"]["state"], "rewinding");
+    call(&mut r, "pedal_report", json!({ "bytes": [0] }));
+
+    // A USB pedal: learn its middle pedal from two reports, then use it as play.
+    let mut cfg = call(&mut r, "pedal_config_get", json!({}));
+    cfg["buttons"] = json!([]);
+    call(&mut r, "pedal_config_set", json!({ "config": cfg }));
+    call(&mut r, "pedal_report", json!({ "bytes": [0, 0] }));
+    call(&mut r, "pedal_learn", json!({ "button": 0 }));
+    let learned = call(&mut r, "pedal_report", json!({ "bytes": [0, 2] }));
+    assert_eq!(learned["learned"]["bit"], json!({ "byte": 1, "mask": 2, "active_low": false }));
+    let mut cfg = call(&mut r, "pedal_config_get", json!({}));
+    cfg["buttons"][0]["action"] = json!("play_toggle");
+    call(&mut r, "pedal_config_set", json!({ "config": cfg }));
+    call(&mut r, "pedal_report", json!({ "bytes": [0, 0] }));
+    let play = call(&mut r, "pedal_report", json!({ "bytes": [0, 2] }));
+    assert_eq!(play["transport"]["state"], "playing");
+
+    for (args, needle) in [(json!({ "bytes": [256] }), "not a byte"), (json!({}), "bytes"), (json!({ "bytes": vec![0; 65] }), "at most")] {
+        let e = r.call("pedal_report", &args).unwrap_err();
+        assert!(e.message.contains(needle), "{e}");
+    }
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
 fn every_tool_has_a_summary_and_a_unique_name() {
     let mut names: Vec<&str> = TOOLS.iter().map(|t| t.name).collect();
     assert!(TOOLS.iter().all(|t| !t.summary.is_empty()));
