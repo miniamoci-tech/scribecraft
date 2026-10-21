@@ -36,6 +36,19 @@ cargo xtask dist                                   # installer / zip / .dmg for 
 | L6 | `crates/ui-egui` | desktop interface |
 | L7 | `apps/scribecraft`, `apps/scribecraft-cli` | the programs |
 
+
+## 🐱 Support the Project (and the Cat Fleet!)
+
+This project is completely free, open source, and developed with an AI-driven approach. While the code is crafted with the help of AI agents, the quality control is managed by three real-life supervisors:
+
+| **Drugo** | **Elia** | **Nancy** |
+| :---: | :---: | :---: |
+| <img src="assets/team/drugo.jpg" alt="Drugo, a black-and-white cat peeking out from under a white sheet" width="200"> | <img src="assets/team/elia.jpg" alt="Elia, a black-and-white cat staring at treats on a table" width="200"> | <img src="assets/team/nancy.jpg" alt="Nancy, a tabby cat resting her paws on the arm of a sofa" width="200"> |
+| *The Senior Consultant* | *The Quality Assurance Analyst* | *The Undercover Operations Manager* |
+| Our wisest and oldest cat. He oversees structural decisions with calm. | Powered exclusively by *Catisfaction* treats. If the code compiles, he purrs. | She monitors the repository from her secret base under the bed. |
+
+👉 [**Buy Elia some Catisfaction on Ko-fi**](https://ko-fi.com/minatore)
+
 Licence: MIT OR Apache-2.0. Third-party notices: [`NOTICE`](NOTICE), [`ATTRIBUTION.toml`](ATTRIBUTION.toml).
 
 ## ⚠️ Disclaimer
