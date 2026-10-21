@@ -4,8 +4,9 @@
 # [[asset]]   one entry per asset file committed to this repository (path, sha256 required).
 # [[bundled]] assets that reach the shipped app through a Cargo dependency.
 #
-# The repository currently commits no asset files: test and demo recordings are generated
-# in code (`scribecraft_media::synth`, `scribecraft-cli tone`) and never committed.
+# The only committed asset files are the README photos of the project's cats
+# (assets/team/). Test and demo recordings are generated in code
+# (`scribecraft_media::synth`, `scribecraft-cli tone`) and never committed.
 
 [[bundled]]
 title = "Ubuntu Light"
@@ -38,3 +39,33 @@ source = "https://crates.io/crates/epaint_default_fonts/0.36.2 (fonts/emoji-icon
 license = "MIT"
 license_file = "licenses/emoji-icon-font-MIT.txt"
 usage = "Fallback icon glyphs in egui, embedded in the desktop app binary."
+
+[[asset]]
+path = "assets/team/drugo.jpg"
+title = "Drugo, project cat (Drugo peeking out from under a sheet)"
+author = "miniamoci-tech"
+source = "contributor-original photograph of the maintainer's own cat, cropped to 480 px with all metadata (EXIF/GPS) removed"
+license = "MIT OR Apache-2.0"
+license_file = "LICENSE-MIT"
+sha256 = "d8d9305f1d27e5575bf715bd281aa6952eb01a9f617585948058a37e80f6ff4a"
+usage = "README, Support the Project section"
+
+[[asset]]
+path = "assets/team/elia.jpg"
+title = "Elia, project cat (Elia eyeing treats on a table)"
+author = "miniamoci-tech"
+source = "contributor-original photograph of the maintainer's own cat, cropped to 480 px with all metadata (EXIF/GPS) removed"
+license = "MIT OR Apache-2.0"
+license_file = "LICENSE-MIT"
+sha256 = "c384c07dafd99229a5c9e600dffcdd1cdcb9bc1f9330a78ee314e7df6c859b70"
+usage = "README, Support the Project section"
+
+[[asset]]
+path = "assets/team/nancy.jpg"
+title = "Nancy, project cat (Nancy resting on the arm of a sofa)"
+author = "miniamoci-tech"
+source = "contributor-original photograph of the maintainer's own cat, cropped to 480 px with all metadata (EXIF/GPS) removed"
+license = "MIT OR Apache-2.0"
+license_file = "LICENSE-MIT"
+sha256 = "1182de53e52ab92635bd9ff486b898f1a28dc8f732743064040b53499d63df85"
+usage = "README, Support the Project section"
