@@ -37,3 +37,19 @@ cargo xtask dist                                   # installer / zip / .dmg for 
 | L7 | `apps/scribecraft`, `apps/scribecraft-cli` | the programs |
 
 Licence: MIT OR Apache-2.0. Third-party notices: [`NOTICE`](NOTICE), [`ATTRIBUTION.toml`](ATTRIBUTION.toml).
+
+## ⚠️ Disclaimer
+
+**Who builds this.** I am not a senior software developer. ScribeCraft is developed with substantial help from AI coding agents: I set the direction, review the changes and test them, but the code has not been audited by professional engineers and may contain bugs, security weaknesses or design mistakes.
+
+**No warranty.** The software is provided "as is", without warranty of any kind, express or implied, including merchantability and fitness for a particular purpose. Use it at your own risk and keep backups of anything important.
+
+**Limitation of liability.** To the maximum extent permitted by applicable law, the author and contributors are not liable for any damage, data loss or other harm arising from the use of, or the inability to use, this software. Nothing here limits any liability that cannot be excluded by law. The binding terms are those of the licence (`LICENSE-MIT` / `LICENSE-APACHE`); this section summarises them and does not replace them.
+
+**Your responsibility.** You alone are responsible for how you use this software and for complying with the laws that apply to you. In particular:
+
+- **Sensitive recordings.** Dictations often contain personal, medical or legal information. If you process them, you are responsible for complying with data-protection and confidentiality rules (for example the GDPR, HIPAA or professional secrecy obligations).
+- **Not a certified product.** ScribeCraft is not a certified medical device, records-management system or legal tool. Check every transcription yourself; the accuracy of the final text is your responsibility.
+- **Copyright.** Only load recordings that you are allowed to use.
+
+**Trademarks and affiliation.** "Express Scribe" and "NCH Software" are trademarks of their owner and are used only to describe the features ScribeCraft aims to be compatible with. ScribeCraft is an independent project, not affiliated with, endorsed by or derived from NCH Software, or the ArtCraft / storytold "Crafting Apps", whose public project conventions inspired this repository's structure.

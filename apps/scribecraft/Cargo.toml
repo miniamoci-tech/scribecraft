@@ -14,4 +14,4 @@ scribecraft-ui-egui.workspace = true
 
 [package.metadata.bundle]
 name = "ScribeCraft"
-identifier = "org.storytold.scribecraft"
+identifier = "io.github.miniamoci-tech.scribecraft"

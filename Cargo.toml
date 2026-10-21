@@ -7,7 +7,7 @@ version = "0.1.2"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.95"
-repository = "https://github.com/storytold/scribecraft"
+repository = "https://github.com/miniamoci-tech/scribecraft"
 
 [workspace.dependencies]
 # internal
