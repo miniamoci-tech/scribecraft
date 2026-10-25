@@ -44,9 +44,6 @@ pub fn list_devices() -> Vec<PedalDevice> {
     let mut out = Vec::new();
     if let Ok(api) = hidapi::HidApi::new() {
         for d in api.device_list() {
-            if is_keyboard_or_mouse(d.usage_page(), d.usage()) {
-                continue;
-            }
             let (vid, pid) = (d.vendor_id(), d.product_id());
             let maker = d.manufacturer_string().unwrap_or("").trim();
             let product = d.product_string().unwrap_or("").trim();
@@ -57,6 +54,9 @@ pub fn list_devices() -> Vec<PedalDevice> {
                 (false, true) => maker.to_owned(),
                 (true, true) => vendor.map(|(_, n)| (*n).to_owned()).unwrap_or_else(|| "USB device".into()),
             };
+            if is_keyboard_or_mouse(d.usage_page(), d.usage(), &name) {
+                continue;
+            }
             let path = d.path().to_string_lossy().into_owned();
             if out.iter().any(|p: &PedalDevice| matches!(&p.source, PedalSource::Hid { path: Some(q), .. } if *q == path)) {
                 continue;
@@ -81,9 +81,20 @@ pub fn list_devices() -> Vec<PedalDevice> {
     out
 }
 
-/// HID usage page 1 (Generic Desktop): 2 = mouse, 6 = keyboard, 7 = keypad.
-fn is_keyboard_or_mouse(usage_page: u16, usage: u16) -> bool {
-    usage_page == 0x01 && matches!(usage, 0x02 | 0x06 | 0x07)
+/// Whether a HID device is a keyboard or a mouse, and so must never be listed or opened.
+///
+/// HID usage page 1 (Generic Desktop) says so for 1 (pointer), 2 (mouse), 6 (keyboard) and
+/// 7 (keypad). macOS's `hidapi` reports usage 0 for several interfaces of a laptop's built-in
+/// keyboard and trackpad, which used to put "Apple Internal Keyboard / Trackpad" in the pedal
+/// list; the name is therefore checked too. Anything named like a keyboard, trackpad or mouse
+/// is refused: a pedal maker does not call its product one, and a mislabelled device would
+/// still be listed under every other interface it exposes.
+fn is_keyboard_or_mouse(usage_page: u16, usage: u16, name: &str) -> bool {
+    if usage_page == 0x01 && matches!(usage, 0x01 | 0x02 | 0x06 | 0x07) {
+        return true;
+    }
+    let name = name.to_lowercase();
+    ["keyboard", "keypad", "trackpad", "touchpad", "mouse", "pointing", "trackball"].iter().any(|word| name.contains(word))
 }
 
 /// What a reader is doing, for the settings window.
@@ -113,6 +124,15 @@ impl PedalReader {
         let source = source.clone();
         if matches!(source, PedalSource::None) {
             return Err(PlatformError::Device("no pedal device is selected".into()));
+        }
+        // A configuration can be edited by hand or written by an older version: refuse to
+        // open a keyboard or mouse even if one was saved as the pedal.
+        if let PedalSource::Hid { name, .. } = &source
+            && is_keyboard_or_mouse(0, 0, name)
+        {
+            return Err(PlatformError::Device(
+                "that device is a keyboard or mouse, not a pedal; choose the pedal's own device in Pedal and keys".into(),
+            ));
         }
         let handle = std::thread::Builder::new()
             .name("scribecraft-pedal".into())
@@ -278,10 +298,53 @@ mod tests {
 
     #[test]
     fn keyboards_and_mice_are_never_pedals() {
-        assert!(is_keyboard_or_mouse(0x01, 0x06));
-        assert!(is_keyboard_or_mouse(0x01, 0x02));
-        assert!(!is_keyboard_or_mouse(0x0c, 0x01));
-        assert!(!is_keyboard_or_mouse(0xff00, 0x06));
+        assert!(is_keyboard_or_mouse(0x01, 0x06, ""));
+        assert!(is_keyboard_or_mouse(0x01, 0x02, ""));
+        assert!(is_keyboard_or_mouse(0x01, 0x01, ""));
+        assert!(!is_keyboard_or_mouse(0x0c, 0x01, "Pedal"));
+        assert!(!is_keyboard_or_mouse(0xff00, 0x06, "Pedal"));
+    }
+
+    /// macOS reports usage 0 for the interfaces of a laptop's built-in keyboard and
+    /// trackpad, so they reached the device list in the pedal window. The name keeps them
+    /// out; a pedal maker does not call its product a keyboard.
+    #[test]
+    fn a_device_named_like_a_keyboard_or_mouse_is_refused_whatever_its_usage() {
+        for name in [
+            "Apple Inc. Apple Internal Keyboard / Trackpad",
+            "Apple Internal Keyboard / Trackpad",
+            "Magic Mouse",
+            "USB KEYBOARD",
+            "Precision Touchpad",
+            "USB Keypad",
+            "USB Optical Mouse",
+        ] {
+            assert!(is_keyboard_or_mouse(0, 0, name), "{name}");
+            assert!(is_keyboard_or_mouse(0x01, 0x0c, name), "{name}");
+        }
+        for name in ["VEC Infinity USB Foot Control", "Olympus RS28", "P.I. Engineering X-keys Pedal", "USB device", ""] {
+            assert!(!is_keyboard_or_mouse(0, 0, name), "{name}: a pedal must still be listed");
+        }
+    }
+
+    /// A configuration can be edited by hand. A keyboard saved as the pedal is refused
+    /// before a reader thread exists, with an error that says what to do.
+    #[test]
+    fn a_saved_keyboard_is_never_opened() {
+        let keyboard = PedalSource::Hid {
+            vendor_id: 0x05ac,
+            product_id: 0x0341,
+            path: Some("SCRIBECRAFT-NO-SUCH-PATH".into()),
+            name: "Apple Internal Keyboard / Trackpad".into(),
+        };
+        match PedalReader::start(&keyboard, |_| {}) {
+            Err(e) => {
+                let text = e.to_string();
+                assert!(text.contains("keyboard"), "{text}");
+                assert!(text.contains("Pedal and keys"), "{text}");
+            }
+            Ok(_) => panic!("a keyboard must never be opened"),
+        }
     }
 
     #[test]
