@@ -193,9 +193,12 @@ mod tests {
             (TEXT, PANEL, "text on a panel"),
             (TEXT, CARD, "text on a card"),
             (TEXT, CARD_HI, "text on a hovered card"),
+            (TEXT, ACCENT_DIM, "text on the open row"),
             (MUTED, BG, "muted text on the window"),
             (MUTED, PANEL, "muted text on a panel"),
             (MUTED, CARD, "muted text on a card"),
+            (MUTED, CARD_HI, "muted text on a hovered row"),
+            (MUTED, ACCENT_DIM, "muted text on the open row"),
             (FAINT, BG, "faint text on the window"),
             (FAINT, PANEL, "faint text on a panel"),
             (FAINT, CARD, "faint text on a card"),
@@ -217,6 +220,9 @@ mod tests {
             (ACCENT, CARD, "the accent on a card"),
             (AMBER, BG, "a bookmark on the window"),
             (AMBER, CARD, "a bookmark on a card"),
+            (AMBER, PANEL, "a high-priority stripe"),
+            (RED, PANEL, "an urgent stripe"),
+            (RED, CARD_HI, "an urgent stripe on a hovered row"),
         ] {
             let ratio = contrast(fg, bg);
             assert!(ratio >= 3.0, "{what}: {ratio:.2}:1, need 3:1");
