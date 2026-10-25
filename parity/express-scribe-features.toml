@@ -62,8 +62,8 @@ tier = "P0"
 milestone = "M0"
 status = "shipped"
 tools = ["transport_control"]
-evidence = ["crates/transport/src/tests.rs::rewind_while_held_then_release_resumes_playing"]
-notes = "Silent scan at 8x (configurable). Not yet: audible scrub while rewinding."
+evidence = ["crates/transport/src/tests.rs::rewind_while_held_then_release_resumes_playing", "crates/ui-egui/src/transport_bar.rs::a_fast_forward_started_by_a_pedal_survives_a_ui_frame", "crates/ui-egui/src/transport_bar.rs::holding_the_fast_forward_button_scans_and_releasing_stops"]
+notes = "Silent scan at 8x (configurable). On the transport bar a scan button scans while held and skips by the configured amount when tapped. Not yet: audible scrub while rewinding."
 
 [[feature]]
 id = "play.speed-presets"
@@ -84,8 +84,8 @@ tier = "P1"
 milestone = "M0"
 status = "shipped"
 tools = ["transport_control", "transport_seek"]
-evidence = ["crates/transport/src/time.rs::formats_and_parses", "crates/transport/src/tests.rs::empty_recording_is_harmless"]
-notes = "Skip length is a setting (5 s); not yet bound to pedals."
+evidence = ["crates/transport/src/time.rs::formats_and_parses", "crates/transport/src/tests.rs::empty_recording_is_harmless", "crates/ui-egui/src/transport_bar.rs::a_tap_on_a_scan_button_skips_by_the_configured_amount"]
+notes = "Skip length is a setting (5 s by default); bound to the skip buttons, to a tap on the scan buttons, and to the pedal actions skip back / skip forward."
 
 [[feature]]
 id = "play.volume"
@@ -282,8 +282,8 @@ tier = "P0"
 milestone = "M3"
 status = "partial"
 tools = ["pedal_config_set", "pedal_report", "pedal_learn", "pedal_config_get"]
-evidence = ["crates/engine/src/pedal.rs::serial_pedal_hold_to_play_with_backstep_and_rewind_while_held", "crates/engine/src/pedal.rs::learning_finds_the_pressed_bit_including_active_low_pedals", "crates/engine/src/pedal.rs::an_active_low_pedal_can_be_learned_and_used", "crates/automation/tests/automation.rs::serial_foot_pedal_drives_playback_end_to_end", "crates/platform/src/pedal.rs::a_missing_device_reports_waiting_and_stops_promptly", "crates/platform/src/pedal.rs::keyboards_and_mice_are_never_pedals"]
-notes = "USB HID pedals (any model: each pedal is learned with one press; known pedal makers are listed first) and serial COM pedals read from the modem lines with DTR raised, using NCH's public wiring note as the default (pin 1 DCD play, pin 6 DSR rewind, pins 8 CTS / 9 RI fast-forward). Play while held or press to toggle; rewind and fast-forward while held; reconnects after unplugging; works while another program is in front. Not yet: tested with a physical pedal, game-port pedals, a udev rule for HID access on Linux. Keyboards and mice are never listed or opened."
+evidence = ["crates/engine/src/pedal.rs::serial_pedal_hold_to_play_with_backstep_and_rewind_while_held", "crates/engine/src/pedal.rs::learning_finds_the_pressed_bit_including_active_low_pedals", "crates/engine/src/pedal.rs::an_active_low_pedal_can_be_learned_and_used", "crates/engine/src/pedal.rs::learning_waits_for_every_pedal_to_be_released", "crates/engine/src/pedal.rs::learning_ignores_a_bit_that_another_pedal_already_uses", "crates/automation/tests/automation.rs::serial_foot_pedal_drives_playback_end_to_end", "crates/platform/src/pedal.rs::a_missing_device_reports_waiting_and_stops_promptly", "crates/platform/src/pedal.rs::keyboards_and_mice_are_never_pedals"]
+notes = "USB HID pedals (any model: each pedal is learned with one press; known pedal makers are listed first) and serial COM pedals read from the modem lines with DTR raised, using NCH's public wiring note as the default (pin 1 DCD play, pin 6 DSR rewind, pins 8 CTS / 9 RI fast-forward). Learning waits until every pedal is up and ignores a bit another pedal already uses, so a pedal held while Learn is clicked is not stored twice. Play while held or press to toggle; rewind and fast-forward while held; reconnects after unplugging; works while another program is in front. Not yet: tested with a physical pedal, game-port pedals, a udev rule for HID access on Linux. Keyboards and mice are never listed or opened."
 
 [[feature]]
 id = "ctl.pedal-wizard"
