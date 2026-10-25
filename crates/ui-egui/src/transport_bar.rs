@@ -201,7 +201,7 @@ impl TransportBar {
                 ui.horizontal(|ui| speed_controls(ui, transport, &now, lang));
             }
             ui.add_space(2.0);
-            ui.add(egui::Label::new(egui::RichText::new(Text::ScanHint.in_lang(lang)).size(11.0).color(theme::FAINT)).wrap());
+            ui.add(egui::Label::new(egui::RichText::new(Text::ScanHint.in_lang(lang)).size(11.0).color(theme::faint())).wrap());
         });
     }
 
@@ -226,10 +226,10 @@ impl TransportBar {
                 egui::pos2(x - 1.0, rail.center().y - theme::RAIL_HEIGHT / 2.0 - 5.0),
                 egui::pos2(x + 1.0, rail.center().y + theme::RAIL_HEIGHT / 2.0),
             );
-            painter.rect_filled(tick, 1.0, theme::AMBER);
+            painter.rect_filled(tick, 1.0, theme::amber());
         }
         let shown = self.scrub.unwrap_or(pos as f64);
-        painter.circle_filled(egui::pos2(bookmark_x(rail, shown.max(0.0).min(dur as f64) as u64, dur), rail.center().y), 3.5, theme::ACCENT);
+        painter.circle_filled(egui::pos2(bookmark_x(rail, shown.max(0.0).min(dur as f64) as u64, dur), rail.center().y), 3.5, theme::accent());
 
         if slider.dragged() {
             self.scrub = Some(value);
@@ -262,10 +262,10 @@ impl TransportBar {
             egui::RichText::new(format!("{}  {}", if now.state == State::Playing { "⏸" } else { "▶" }, text.in_lang(lang)))
                 .size(15.0)
                 .strong()
-                .color(theme::ACCENT_INK),
+                .color(theme::accent_ink()),
         )
-        .fill(theme::ACCENT)
-        .stroke(egui::Stroke::new(1.0, theme::ACCENT))
+        .fill(theme::accent())
+        .stroke(egui::Stroke::new(1.0, theme::accent()))
         .corner_radius(9)
         .min_size(egui::vec2(112.0, 38.0));
         if ui.add(play).on_hover_text(hint.in_lang(lang)).clicked() {
@@ -288,18 +288,20 @@ fn header(ui: &mut egui::Ui, now: &Snapshot, lang: Lang) {
     // row still shows it.
     let compact = ui.available_width() < 620.0;
     ui.horizontal(|ui| {
-        let clock = egui::RichText::new(format_timestamp(now.pos, true)).font(egui::FontId::monospace(30.0)).strong().color(theme::TEXT);
+        let clock = egui::RichText::new(format_timestamp(now.pos, true)).font(egui::FontId::monospace(30.0)).strong().color(theme::text());
         ui.label(clock);
-        let total = egui::RichText::new(format!("/ {}", format_timestamp(now.dur, true))).font(egui::FontId::monospace(15.0)).color(theme::FAINT);
+        let total = egui::RichText::new(format!("/ {}", format_timestamp(now.dur, true))).font(egui::FontId::monospace(15.0)).color(theme::faint());
         ui.label(total).on_hover_text(Text::Length.in_lang(lang));
         ui.add_space(4.0);
         state_pill(ui, now.state, now.rewind_rate, now.fast_rate, lang);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let remaining = now.dur.saturating_sub(now.pos);
-            ui.label(egui::RichText::new(format!("−{}", format_timestamp(remaining, true))).font(egui::FontId::monospace(13.0)).color(theme::MUTED))
-                .on_hover_text(Text::TimeRemaining.in_lang(lang));
+            ui.label(
+                egui::RichText::new(format!("−{}", format_timestamp(remaining, true))).font(egui::FontId::monospace(13.0)).color(theme::muted()),
+            )
+            .on_hover_text(Text::TimeRemaining.in_lang(lang));
             if !compact {
-                ui.label(egui::RichText::new(format!("{:.0} %", now.speed * 100.0)).size(12.0).color(theme::FAINT));
+                ui.label(egui::RichText::new(format!("{:.0} %", now.speed * 100.0)).size(12.0).color(theme::faint()));
             }
         });
     });
@@ -318,9 +320,9 @@ fn state_text(state: State, rewind_rate: f64, fast_rate: f64, lang: Lang) -> Str
 /// A pill that says what the transport is doing, with a lamp and the scan rate.
 fn state_pill(ui: &mut egui::Ui, state: State, rewind_rate: f64, fast_rate: f64, lang: Lang) {
     let (fill, ink, lamp) = match state {
-        State::Stopped => (theme::CARD_HI, theme::MUTED, theme::FAINT),
-        State::Playing => (theme::ACCENT_DIM, theme::ACCENT_SOFT, theme::ACCENT),
-        State::Rewinding | State::FastForwarding => (theme::AMBER_DIM, theme::AMBER_SOFT, theme::AMBER),
+        State::Stopped => (theme::card_hi(), theme::muted(), theme::faint()),
+        State::Playing => (theme::accent_dim(), theme::accent_soft(), theme::accent()),
+        State::Rewinding | State::FastForwarding => (theme::amber_dim(), theme::amber_soft(), theme::amber()),
     };
     let text = state_text(state, rewind_rate, fast_rate, lang);
     theme::pill_frame(fill).show(ui, |ui| {
@@ -416,7 +418,7 @@ mod tests {
     /// Draws one complete interface frame and returns the shapes it painted.
     fn draw(bar: &mut TransportBar, t: &Arc<Mutex<Transport>>, bookmarks: &[u64]) -> Vec<egui::Shape> {
         let ctx = egui::Context::default();
-        theme::apply(&ctx);
+        theme::apply(&ctx, theme::Theme::Dark);
         let mut output = ctx.run_ui(egui::RawInput::default(), |ui| bar.show(ui, t, 5_000, bookmarks, Lang::English));
         // No renderer here; drop the font-atlas deltas as a renderer would consume them.
         let shapes = output.shapes.iter().map(|s| s.shape.clone()).collect();
@@ -546,7 +548,7 @@ mod tests {
         let marks = shapes
             .iter()
             .filter(|s| match s {
-                egui::Shape::Rect(r) => r.fill == theme::AMBER,
+                egui::Shape::Rect(r) => r.fill == theme::amber(),
                 _ => false,
             })
             .count();
