@@ -19,6 +19,7 @@ Engineering debts: linear output resampler; WSOLA graininess below 40 %; depende
 (cpal 0.18, Symphonia 0.6).
 
 ## Revision history
+- 2026-10-25 — queue rows start playback when picked (the open row is not restarted); multi-file add says how many it added, opens the first and says several can be chosen.
 - 2026-10-25 — restyle phase 3: dictation fields and bookmarks in a resizable right-hand details panel with a status pill; the notes editor moved to the centre, where there is room for it; write-back extracted into `apply_edits` and tested against bookmarks and pasted text.
 - 2026-10-25 — restyle phase 2: filter chips with counts above the queue (All / To do / In progress / Done / Sent) and hand-painted job rows with priority stripes, title elision, meta line and right-aligned duration; contrast covered by theme tests, filtering by a headless click test.
 - 2026-10-25 — restyle phase 1: one dark palette in `theme.rs` (WCAG-AA contrast checked by tests), a transport dock at the bottom with clock, state pill, remaining time and bookmark marks on the seek bar, and a scrolling pane for the open dictation on short windows.

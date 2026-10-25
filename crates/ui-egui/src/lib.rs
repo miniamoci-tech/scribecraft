@@ -136,6 +136,12 @@ impl App {
         }
     }
 
+    /// Opens a dictation and starts it: picking a job in the queue means listening to it.
+    fn open_and_play(&mut self, id: u64) {
+        self.open(id);
+        let _ = self.with_transport(|t| t.play());
+    }
+
     fn save(&mut self) {
         if let Err(e) = self.session.save() {
             self.report(Err(e.to_string()));
@@ -228,15 +234,23 @@ impl App {
                 .fill(theme::ACCENT)
                 .stroke(egui::Stroke::new(1.0, theme::ACCENT))
                 .corner_radius(8);
-            if ui.add(add).on_hover_text("Choose recordings to add to the job list").clicked()
+            if ui.add(add).on_hover_text("Choose one or more recordings to add to the job list").clicked()
                 && let Some(files) = rfd::FileDialog::new().add_filter("Recordings", media::SUPPORTED_EXTENSIONS).pick_files()
             {
-                let mut last = None;
+                let mut added = Vec::new();
+                let mut failed = 0;
                 for f in files {
-                    last = self.add_file(&f).or(last);
+                    match self.add_file(&f) {
+                        Some(id) => added.push(id),
+                        None => failed += 1,
+                    }
                 }
-                if let Some(id) = last {
-                    self.open(id);
+                if failed == 0 && !added.is_empty() {
+                    self.report(Ok(added_message(added.len())));
+                }
+                // Open the first one picked, so the list starts at what was just added.
+                if let Some(id) = added.first() {
+                    self.open(*id);
                 }
             }
             if ui.button("Add folder…").clicked()
@@ -290,7 +304,7 @@ impl App {
                     continue;
                 }
                 shown += 1;
-                if job_list::row(ui, row, open_id == Some(row.id)).clicked() && open_id != Some(row.id) {
+                if job_list::row(ui, row, open_id == Some(row.id)).clicked() && opens_on_click(row.id, open_id) {
                     open = Some(row.id);
                 }
                 ui.add_space(2.0);
@@ -301,7 +315,7 @@ impl App {
             ui.label(format!("Nothing under “{}”. Pick “All” to see the whole queue.", self.filter.label()));
         }
         if let Some(id) = open {
-            self.open(id);
+            self.open_and_play(id);
         }
     }
 
@@ -613,6 +627,16 @@ fn status_pill(ui: &mut egui::Ui, status: Status) {
     });
 }
 
+/// A click on a queue row switches to it; a click on the open row must not restart it.
+fn opens_on_click(clicked: u64, open: Option<u64>) -> bool {
+    open != Some(clicked)
+}
+
+/// What the toolbar says after a multi-file pick.
+fn added_message(n: usize) -> String {
+    if n == 1 { "added 1 recording".to_owned() } else { format!("added {n} recordings") }
+}
+
 /// Copies the edited fields back, leaving bookmarks, the path and the saved position alone.
 /// Free text is capped so a paste cannot outgrow the job file.
 fn apply_edits(target: &mut Dictation, edited: &Dictation) {
@@ -751,6 +775,21 @@ mod tests {
         draw(Vec::new());
         let scrolled = draw(Vec::new());
         assert!(scrolled < first - 20.0, "the wheel must bring the rest into view: {first} -> {scrolled}");
+    }
+
+    /// A click on a queue row switches to it and starts it; a click on the row that is already
+    /// open must not restart the audio from the saved position.
+    #[test]
+    fn clicking_a_row_opens_it_but_the_open_row_is_not_restarted() {
+        assert!(opens_on_click(2, Some(1)), "another job must open");
+        assert!(opens_on_click(1, None), "the first job must open");
+        assert!(!opens_on_click(1, Some(1)), "the open job must keep playing");
+    }
+
+    #[test]
+    fn the_change_report_counts_the_recordings() {
+        assert_eq!(added_message(1), "added 1 recording");
+        assert_eq!(added_message(3), "added 3 recordings");
     }
 
     /// A bookmark added while the frame is open is written straight into the job; the copy of
