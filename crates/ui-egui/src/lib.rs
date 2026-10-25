@@ -8,6 +8,7 @@
 //! window, F10 copy time stamp · Ctrl+B bookmark · Ctrl+S save.
 
 mod controls;
+mod theme;
 mod transport_bar;
 
 use std::path::{Path, PathBuf};
@@ -45,6 +46,7 @@ struct App {
 
 impl App {
     fn new(ctx: egui::Context, files: Vec<PathBuf>) -> Self {
+        theme::apply(&ctx);
         let dir = scribecraft_platform::data_dir();
         let mut message = None;
         if let Some(d) = &dir
@@ -216,7 +218,13 @@ impl App {
 
     fn toolbar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            if ui.button("Add recordings…").clicked()
+            brand(ui);
+            ui.add_space(6.0);
+            let add = egui::Button::new(egui::RichText::new("Add recordings…").strong().color(theme::ACCENT_INK))
+                .fill(theme::ACCENT)
+                .stroke(egui::Stroke::new(1.0, theme::ACCENT))
+                .corner_radius(8);
+            if ui.add(add).on_hover_text("Choose recordings to add to the job list").clicked()
                 && let Some(files) = rfd::FileDialog::new().add_filter("Recordings", media::SUPPORTED_EXTENSIONS).pick_files()
             {
                 let mut last = None;
@@ -248,8 +256,9 @@ impl App {
             if ui.button("Pedal and keys…").clicked() {
                 self.controls.open = true;
             }
-            ui.separator();
-            ui.weak(format!("{} · F10 copy time · Ctrl+B bookmark", self.controls.key_hint()));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.weak("F10 stamp · Ctrl+B bookmark").on_hover_text(self.controls.key_hint());
+            });
         });
     }
 
@@ -283,37 +292,61 @@ impl App {
         }
     }
 
-    fn transport_bar(&mut self, ui: &mut egui::Ui) {
+    /// The dock at the bottom: the open dictation's transport, or a hint when none is open.
+    fn transport_dock(&mut self, ui: &mut egui::Ui) {
         let Some(t) = self.transport.clone() else {
-            ui.label("Open a dictation to start transcribing.");
+            theme::card_frame().show(ui, |ui| {
+                ui.set_min_width(ui.available_width());
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new("No dictation open").strong().color(theme::TEXT));
+                    ui.label(egui::RichText::new("Add or open a recording to start transcribing.").color(theme::MUTED));
+                });
+            });
             return;
         };
+        let bookmarks: Vec<u64> = self
+            .session
+            .open_id()
+            .and_then(|id| self.session.jobs().get(id).ok())
+            .map(|job| job.bookmarks.iter().map(|b| b.ms).collect())
+            .unwrap_or_default();
         let skip = self.session.settings().skip_ms;
-        self.bar.show(ui, &t, skip);
+        self.bar.show(ui, &t, skip, &bookmarks);
     }
 
     fn settings_row(&mut self, ui: &mut egui::Ui) {
         let mut s: Settings = self.session.settings().clone();
         let before = s.clone();
-        ui.horizontal(|ui| {
-            ui.add(egui::Slider::new(&mut s.volume_db, -30.0..=12.0).suffix(" dB").text("volume"));
-            egui::ComboBox::from_label("channels").selected_text(channel_name(s.channel_mode)).show_ui(ui, |ui| {
-                for m in [ChannelMode::Stereo, ChannelMode::Left, ChannelMode::Right, ChannelMode::Mix] {
-                    ui.selectable_value(&mut s.channel_mode, m, channel_name(m));
-                }
+        theme::card_frame().show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
+            ui.label(theme::caption("PLAYBACK"));
+            ui.add_space(2.0);
+            ui.horizontal_wrapped(|ui| {
+                field(ui, "volume", |ui| {
+                    ui.spacing_mut().slider_width = 90.0;
+                    ui.add(egui::Slider::new(&mut s.volume_db, -30.0..=12.0).suffix(" dB"));
+                });
+                egui::ComboBox::from_label("channels").selected_text(channel_name(s.channel_mode)).show_ui(ui, |ui| {
+                    for m in [ChannelMode::Stereo, ChannelMode::Left, ChannelMode::Right, ChannelMode::Mix] {
+                        ui.selectable_value(&mut s.channel_mode, m, channel_name(m));
+                    }
+                });
+                field(ui, "auto-backstep", |ui| {
+                    ui.add(egui::DragValue::new(&mut s.auto_backstep_ms).range(0..=60_000).speed(50).suffix(" ms"));
+                });
+                field(ui, "slow", |ui| {
+                    let mut slow = s.slow_speed * 100.0;
+                    if ui.add(egui::DragValue::new(&mut slow).range(10.0..=400.0).suffix(" %")).changed() {
+                        s.slow_speed = slow / 100.0;
+                    }
+                });
+                field(ui, "fast", |ui| {
+                    let mut fast = s.fast_speed * 100.0;
+                    if ui.add(egui::DragValue::new(&mut fast).range(10.0..=400.0).suffix(" %")).changed() {
+                        s.fast_speed = fast / 100.0;
+                    }
+                });
             });
-            ui.add(egui::DragValue::new(&mut s.auto_backstep_ms).range(0..=60_000).speed(50).suffix(" ms"));
-            ui.label("auto-backstep");
-            let mut slow = s.slow_speed * 100.0;
-            if ui.add(egui::DragValue::new(&mut slow).range(10.0..=400.0).suffix(" %")).changed() {
-                s.slow_speed = slow / 100.0;
-            }
-            ui.label("slow");
-            let mut fast = s.fast_speed * 100.0;
-            if ui.add(egui::DragValue::new(&mut fast).range(10.0..=400.0).suffix(" %")).changed() {
-                s.fast_speed = fast / 100.0;
-            }
-            ui.label("fast");
         });
         if s != before {
             match self.session.set_settings(s) {
@@ -328,67 +361,73 @@ impl App {
         let Ok(job) = self.session.jobs().get(id) else { return };
         let mut job = job.clone();
         let before = job.clone();
-        ui.separator();
-        ui.horizontal(|ui| {
-            ui.label("Title");
-            ui.text_edit_singleline(&mut job.title);
-            ui.label("Author");
-            ui.text_edit_singleline(&mut job.author);
-        });
-        ui.horizontal(|ui| {
-            egui::ComboBox::from_label("priority").selected_text(format!("{:?}", job.priority)).show_ui(ui, |ui| {
-                for p in [Priority::Low, Priority::Normal, Priority::High, Priority::Urgent] {
-                    ui.selectable_value(&mut job.priority, p, format!("{p:?}"));
-                }
+        ui.add_space(6.0);
+        theme::card_frame().show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
+            ui.label(theme::caption("DICTATION"));
+            ui.add_space(2.0);
+            ui.horizontal(|ui| {
+                ui.label("Title");
+                ui.text_edit_singleline(&mut job.title);
+                ui.label("Author");
+                ui.text_edit_singleline(&mut job.author);
             });
-            egui::ComboBox::from_label("status").selected_text(status_name(job.status)).show_ui(ui, |ui| {
-                for s in [Status::New, Status::InProgress, Status::Done, Status::Dispatched] {
-                    ui.selectable_value(&mut job.status, s, status_name(s));
-                }
-            });
-            ui.label("Due");
-            ui.add(egui::TextEdit::singleline(&mut job.due).desired_width(110.0).hint_text("YYYY-MM-DD"));
-        });
-        ui.horizontal(|ui| {
-            if ui.button("Copy time stamp").on_hover_text("F10").clicked() {
-                self.copy_timestamp(ctx);
-            }
-            ui.add(egui::TextEdit::singleline(&mut self.bookmark_label).hint_text("bookmark label").desired_width(200.0));
-            if ui.button("Add bookmark").on_hover_text("Ctrl+B").clicked() {
-                self.bookmark();
-            }
-        });
-        let mut jump = None;
-        if !job.bookmarks.is_empty() {
-            ui.collapsing(format!("Bookmarks ({})", job.bookmarks.len()), |ui| {
-                for b in &job.bookmarks {
-                    if ui.link(format!("{}  {}", format_timestamp(b.ms, true), b.label)).clicked() {
-                        jump = Some(b.ms);
+            ui.horizontal(|ui| {
+                egui::ComboBox::from_label("priority").selected_text(format!("{:?}", job.priority)).show_ui(ui, |ui| {
+                    for p in [Priority::Low, Priority::Normal, Priority::High, Priority::Urgent] {
+                        ui.selectable_value(&mut job.priority, p, format!("{p:?}"));
                     }
+                });
+                egui::ComboBox::from_label("status").selected_text(status_name(job.status)).show_ui(ui, |ui| {
+                    for s in [Status::New, Status::InProgress, Status::Done, Status::Dispatched] {
+                        ui.selectable_value(&mut job.status, s, status_name(s));
+                    }
+                });
+                ui.label("Due");
+                ui.add(egui::TextEdit::singleline(&mut job.due).desired_width(110.0).hint_text("YYYY-MM-DD"));
+            });
+            ui.horizontal(|ui| {
+                if ui.button("Copy time stamp").on_hover_text("F10").clicked() {
+                    self.copy_timestamp(ctx);
+                }
+                ui.add(egui::TextEdit::singleline(&mut self.bookmark_label).hint_text("bookmark label").desired_width(200.0));
+                if ui.button("Add bookmark").on_hover_text("Ctrl+B").clicked() {
+                    self.bookmark();
                 }
             });
-        }
-        ui.label("Notes");
-        ui.add(egui::TextEdit::multiline(&mut job.notes).desired_rows(6).desired_width(f32::INFINITY));
-        if let Some(ms) = jump {
-            self.with_transport(|t| t.seek_ms(ms));
-        }
-        let edited = job.title != before.title
-            || job.author != before.author
-            || job.priority != before.priority
-            || job.status != before.status
-            || job.due != before.due
-            || job.notes != before.notes;
-        // Field by field: a bookmark added above this frame must not be overwritten by the copy.
-        if edited && let Ok(d) = self.session.jobs_mut().get_mut(id) {
-            let limit = |s: String| s.chars().take(scribecraft_engine::MAX_TEXT_CHARS).collect::<String>();
-            d.title = limit(job.title);
-            d.author = limit(job.author);
-            d.priority = job.priority;
-            d.status = job.status;
-            d.due = limit(job.due);
-            d.notes = limit(job.notes);
-        }
+            let mut jump = None;
+            if !job.bookmarks.is_empty() {
+                egui::CollapsingHeader::new(format!("Bookmarks ({})", job.bookmarks.len())).show(ui, |ui| {
+                    for b in &job.bookmarks {
+                        if ui.link(format!("{}  {}", format_timestamp(b.ms, true), b.label)).clicked() {
+                            jump = Some(b.ms);
+                        }
+                    }
+                });
+            }
+            ui.add_space(6.0);
+            ui.label(theme::caption("NOTES"));
+            ui.add(egui::TextEdit::multiline(&mut job.notes).desired_rows(6).desired_width(f32::INFINITY));
+            if let Some(ms) = jump {
+                self.with_transport(|t| t.seek_ms(ms));
+            }
+            let edited = job.title != before.title
+                || job.author != before.author
+                || job.priority != before.priority
+                || job.status != before.status
+                || job.due != before.due
+                || job.notes != before.notes;
+            // Field by field: a bookmark added above this frame must not be overwritten by the copy.
+            if edited && let Ok(d) = self.session.jobs_mut().get_mut(id) {
+                let limit = |s: String| s.chars().take(scribecraft_engine::MAX_TEXT_CHARS).collect::<String>();
+                d.title = limit(job.title);
+                d.author = limit(job.author);
+                d.priority = job.priority;
+                d.status = job.status;
+                d.due = limit(job.due);
+                d.notes = limit(job.notes);
+            }
+        });
     }
 }
 
@@ -398,8 +437,8 @@ impl eframe::App for App {
         let ctx = &ctx;
         self.files_dropped(ctx);
         self.keyboard(ctx);
-        egui::Panel::top("toolbar").show(root, |ui| self.toolbar(ui));
-        egui::Panel::bottom("status").show(root, |ui| {
+        egui::Panel::top("toolbar").frame(theme::top_frame()).show(root, |ui| self.toolbar(ui));
+        egui::Panel::bottom("status").frame(theme::status_frame()).show(root, |ui| {
             ui.horizontal(|ui| {
                 match &self.message {
                     Some((m, true)) => ui.colored_label(ui.visuals().error_fg_color, m),
@@ -409,13 +448,15 @@ impl eframe::App for App {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| ui.weak(self.controls.status()));
             });
         });
+        egui::Panel::bottom("transport").frame(theme::dock_frame()).show(root, |ui| self.transport_dock(ui));
         self.controls.window(ctx);
-        egui::Panel::left("jobs").resizable(true).default_size(300.0).show(root, |ui| self.job_list(ui));
-        egui::CentralPanel::default().show(root, |ui| {
-            self.transport_bar(ui);
-            ui.separator();
-            self.settings_row(ui);
-            self.details(ui, ctx);
+        egui::Panel::left("jobs").frame(theme::side_frame()).resizable(true).default_size(300.0).show(root, |ui| self.job_list(ui));
+        egui::CentralPanel::default().frame(theme::central_frame()).show(root, |ui| {
+            // The dock keeps its height at the bottom; a short window scrolls the rest.
+            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                self.settings_row(ui);
+                self.details(ui, ctx);
+            });
         });
         // Keep the clock moving while sound plays.
         if self.with_transport(|t| t.state() != State::Stopped).unwrap_or(false) {
@@ -435,6 +476,24 @@ fn load_settings(path: &Path) -> Option<Settings> {
     let bytes = std::fs::read(path).ok()?;
     let s: Settings = serde_json::from_slice(&bytes).ok()?;
     s.validate().ok().map(|()| s)
+}
+
+/// The product mark and name in the toolbar. The mark is drawn here, not loaded: an original
+/// shape, no asset file to license.
+fn brand(ui: &mut egui::Ui) {
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(20.0, 20.0), egui::Sense::hover());
+    ui.painter().rect_filled(rect, 6.0, theme::ACCENT);
+    ui.painter().rect_filled(rect.shrink(5.5), 2.0, theme::ACCENT_INK);
+    ui.label(egui::RichText::new("ScribeCraft").size(15.0).strong());
+}
+
+/// A label and its widget kept together when the settings row wraps.
+fn field(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        ui.label(egui::RichText::new(label).color(theme::MUTED));
+        add(ui);
+    });
 }
 
 fn priority_mark(p: Priority) -> &'static str {
@@ -460,5 +519,66 @@ fn channel_name(m: ChannelMode) -> &'static str {
         ChannelMode::Left => "left only",
         ChannelMode::Right => "right only",
         ChannelMode::Mix => "mono mix",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The dock and the status bar keep their height at the bottom of the window, so on a
+    /// short window the pane between them must scroll. Without the scroll area the lower
+    /// fields would simply be cut off and unreachable.
+    #[test]
+    fn a_short_window_scrolls_the_pane_above_the_dock() {
+        // The same panel order as `App::ui`: status, dock, then the central pane.
+        let ctx = egui::Context::default();
+        theme::apply(&ctx);
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(900.0, 320.0));
+        let draw = |events: Vec<egui::Event>| {
+            let input = egui::RawInput { screen_rect: Some(screen), events, ..Default::default() };
+            let mut marker = f32::NAN;
+            let mut clock = f32::NAN;
+            let mut output = ctx.run_ui(input, |ui| {
+                egui::Panel::bottom("status").frame(theme::status_frame()).show(ui, |ui| {
+                    ui.label("ready");
+                });
+                egui::Panel::bottom("transport").frame(theme::dock_frame()).show(ui, |ui| {
+                    clock = ui.label("00:00:12.4").rect.top();
+                });
+                egui::CentralPanel::default().frame(theme::central_frame()).show(ui, |ui| {
+                    egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                        marker = ui.label("marker").rect.top();
+                        for i in 0..60 {
+                            ui.label(format!("line {i}"));
+                        }
+                    });
+                });
+            });
+            output.textures_delta.clear();
+            (marker, clock)
+        };
+
+        // egui smooths a wheel event over the next frames: the offset is applied on the
+        // frames after the event, so measure once the movement has settled.
+        let (marker_top, clock_top) = {
+            draw(Vec::new());
+            draw(Vec::new())
+        };
+        let pointer = screen.center();
+        draw(vec![
+            egui::Event::PointerMoved(pointer),
+            egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                delta: egui::vec2(0.0, -100.0),
+                phase: egui::TouchPhase::Move,
+                modifiers: egui::Modifiers::default(),
+            },
+        ]);
+        draw(Vec::new());
+        let (scrolled_top, clock_after) = draw(Vec::new());
+
+        assert!(scrolled_top < marker_top - 20.0, "the pane should scroll: {marker_top} -> {scrolled_top}");
+        assert_eq!(clock_top, clock_after, "scrolling must not move the transport dock");
     }
 }
