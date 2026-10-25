@@ -10,6 +10,7 @@ use eframe::egui::{self, Color32, FontFamily, FontId, Stroke};
 use scribecraft_engine::transport::format_timestamp;
 use scribecraft_engine::{Dictation, Priority, Status};
 
+use crate::i18n::{Lang, Text};
 use crate::theme;
 
 /// Height of one row in the queue.
@@ -40,13 +41,13 @@ impl Filter {
     /// Every filter, in the order the chips are shown.
     pub(crate) const ALL: [Filter; 5] = [Filter::All, Filter::Todo, Filter::InProgress, Filter::Done, Filter::Dispatched];
 
-    pub(crate) fn label(self) -> &'static str {
+    pub(crate) fn label(self, lang: Lang) -> &'static str {
         match self {
-            Self::All => "All",
-            Self::Todo => "To do",
-            Self::InProgress => "In progress",
-            Self::Done => "Done",
-            Self::Dispatched => "Sent",
+            Self::All => Text::FilterAll.in_lang(lang),
+            Self::Todo => Text::FilterTodo.in_lang(lang),
+            Self::InProgress => Text::FilterInProgress.in_lang(lang),
+            Self::Done => Text::FilterDone.in_lang(lang),
+            Self::Dispatched => Text::FilterSent.in_lang(lang),
         }
     }
 
@@ -88,14 +89,14 @@ impl Row {
     }
 
     /// The title as shown: never an empty line when a file has no name.
-    fn display_title(&self) -> &str {
-        if self.title.trim().is_empty() { "Untitled recording" } else { &self.title }
+    fn display_title(&self, lang: Lang) -> &str {
+        if self.title.trim().is_empty() { Text::Untitled.in_lang(lang) } else { &self.title }
     }
 
     /// The second line: status, then the author (or an honest "no author").
-    fn meta(&self) -> String {
-        let author = if self.author.trim().is_empty() { "no author" } else { self.author.trim() };
-        format!("{} · {author}", status_name(self.status))
+    fn meta(&self, lang: Lang) -> String {
+        let author = if self.author.trim().is_empty() { Text::NoAuthor.in_lang(lang) } else { self.author.trim() };
+        format!("{} · {author}", status_name(self.status, lang))
     }
 
     fn duration(&self) -> String {
@@ -104,12 +105,12 @@ impl Row {
 }
 
 /// The chips above the queue. Returns true when the filter changed.
-pub(crate) fn chips(ui: &mut egui::Ui, filter: &mut Filter, rows: &[Row]) -> bool {
+pub(crate) fn chips(ui: &mut egui::Ui, filter: &mut Filter, rows: &[Row], lang: Lang) -> bool {
     let mut changed = false;
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
         for candidate in Filter::ALL {
-            let text = format!("{} {}", candidate.label(), count(rows, candidate));
+            let text = format!("{} {}", candidate.label(lang), count(rows, candidate));
             if chip(ui, &text, *filter == candidate).clicked() {
                 *filter = candidate;
                 changed = true;
@@ -149,7 +150,7 @@ fn chip(ui: &mut egui::Ui, text: &str, selected: bool) -> egui::Response {
 }
 
 /// One dictation: a priority stripe, the title, its state and author, and the duration.
-pub(crate) fn row(ui: &mut egui::Ui, row: &Row, open: bool) -> egui::Response {
+pub(crate) fn row(ui: &mut egui::Ui, row: &Row, open: bool, lang: Lang) -> egui::Response {
     let width = ui.available_width();
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, ROW_HEIGHT), egui::Sense::click());
     if !ui.is_rect_visible(rect) {
@@ -177,8 +178,8 @@ pub(crate) fn row(ui: &mut egui::Ui, row: &Row, open: bool) -> egui::Response {
     let right = rect.right() - 10.0;
     let duration = one_line(painter, &row.duration(), small_font(), meta_colour, right - left);
     let text_width = (right - left - duration.size().x - 10.0).max(0.0);
-    let title = one_line(painter, row.display_title(), title_font(), title_colour, text_width);
-    let meta = one_line(painter, &row.meta(), small_font(), meta_colour, text_width);
+    let title = one_line(painter, row.display_title(lang), title_font(), title_colour, text_width);
+    let meta = one_line(painter, &row.meta(lang), small_font(), meta_colour, text_width);
     painter.galley(egui::pos2(left, rect.top() + 8.0), title, title_colour);
     painter.galley(egui::pos2(left, rect.top() + 27.0), meta, meta_colour);
     painter.galley(egui::pos2(right - duration.size().x, rect.center().y - duration.size().y / 2.0), duration, meta_colour);
@@ -192,12 +193,12 @@ fn one_line(painter: &egui::Painter, text: &str, font: FontId, colour: Color32, 
     painter.layout_job(job)
 }
 
-pub(crate) fn status_name(s: Status) -> &'static str {
+pub(crate) fn status_name(s: Status, lang: Lang) -> &'static str {
     match s {
-        Status::New => "new",
-        Status::InProgress => "in progress",
-        Status::Done => "done",
-        Status::Dispatched => "dispatched",
+        Status::New => Text::StatusNew.in_lang(lang),
+        Status::InProgress => Text::StatusInProgress.in_lang(lang),
+        Status::Done => Text::StatusDone.in_lang(lang),
+        Status::Dispatched => Text::StatusDispatched.in_lang(lang),
     }
 }
 
@@ -216,7 +217,7 @@ mod tests {
         let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(320.0, 200.0));
         let input = egui::RawInput { screen_rect: Some(screen), ..Default::default() };
         let mut output = ctx.run_ui(input, |ui| {
-            row(ui, job, open);
+            row(ui, job, open, Lang::English);
         });
         let shapes = output.shapes.iter().map(|s| s.shape.clone()).collect();
         output.textures_delta.clear();
@@ -238,7 +239,7 @@ mod tests {
         let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(700.0, 200.0));
         let input = egui::RawInput { screen_rect: Some(screen), events, ..Default::default() };
         let mut output = ctx.run_ui(input, |ui| {
-            chips(ui, filter, rows);
+            chips(ui, filter, rows, Lang::English);
         });
         let shapes = output.shapes.iter().map(|s| s.shape.clone()).collect();
         output.textures_delta.clear();
@@ -276,6 +277,18 @@ mod tests {
         pass(&ctx, click, &mut filter, &rows);
         assert_eq!(filter, Filter::Done, "clicking Done must filter the queue to finished work");
         assert_eq!(count(&rows, filter), 1);
+    }
+
+    /// The queue speaks the chosen language: chips, status line and the empty-title fallback.
+    #[test]
+    fn the_queue_speaks_the_chosen_language() {
+        assert_eq!(Filter::All.label(Lang::Italiano), "Tutte");
+        assert_eq!(Filter::Dispatched.label(Lang::Italiano), "Inviate");
+        assert_eq!(status_name(Status::InProgress, Lang::Italiano), "in corso");
+        assert_eq!(status_name(Status::Done, Lang::English), "done");
+        let row = Row { title: "  ".into(), ..sample(Status::New, Priority::Normal) };
+        assert_eq!(row.display_title(Lang::Italiano), "Dettatura senza titolo");
+        assert_eq!(row.meta(Lang::Italiano), "nuova · Dr. Example");
     }
 
     /// Every status belongs to exactly one chip other than "All".

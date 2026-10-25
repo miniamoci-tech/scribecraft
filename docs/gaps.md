@@ -11,7 +11,7 @@
 | 5 | WMA, DCT and other dictation formats | Common in older workflows | fmt.wma, fmt.dct, fmt.other-dictation | M1 |
 | 6 | Streaming decode | Multi-hour recordings exceed the in-memory cap | — | M1 |
 | 7 | Automatic intake and dispatch | Timed folder watch, FTP/e-mail (opt-in) | job.folder-watch, job.remote-intake, job.dispatch | M4 |
-| 8 | Waveform, end-to-end UI tests, i18n | 1.0 polish | play.waveform, ctl.hotkeys-window | M2 |
+| 8 | Waveform, end-to-end UI tests, more UI languages | 1.0 polish; English and Italian ship now, engine/device messages stay English | play.waveform, ctl.hotkeys-window | M2 |
 | 9 | Signed/notarized installers | SmartScreen and Gatekeeper warnings | plat.windows, plat.macos | M7 |
 | 10 | Video window | Video transcription | play.video | M6 |
 
@@ -19,6 +19,7 @@ Engineering debts: linear output resampler; WSOLA graininess below 40 %; depende
 (cpal 0.18, Symphonia 0.6).
 
 ## Revision history
+- 2026-10-25 — the interface speaks English and Italian: one string table in `i18n.rs` (a missing translation does not compile), a toolbar selector, the choice saved atomically in `ui.json`, placeholders checked for both languages; engine and device messages stay as they come. The longer Italian labels showed the bookmark row overflowing the details panel and widening it frame after frame; the label field and the buttons are now on separate lines, with a headless regression test in both languages.
 - 2026-10-25 — queue rows start playback when picked (the open row is not restarted); multi-file add says how many it added, opens the first and says several can be chosen.
 - 2026-10-25 — restyle phase 3: dictation fields and bookmarks in a resizable right-hand details panel with a status pill; the notes editor moved to the centre, where there is room for it; write-back extracted into `apply_edits` and tested against bookmarks and pasted text.
 - 2026-10-25 — restyle phase 2: filter chips with counts above the queue (All / To do / In progress / Done / Sent) and hand-painted job rows with priority stripes, title elision, meta line and right-aligned duration; contrast covered by theme tests, filtering by a headless click test.
