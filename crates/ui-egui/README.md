@@ -20,7 +20,17 @@ and the tests check both languages use the same placeholders. Strings that come 
 engine, the platform or a device (decoder errors, hotkey names, a pedal's own path) stay as
 the system or file gives them.
 
+**Quitting.** On macOS the window closes through `-[NSApplication terminate:]`, never by letting
+eframe drop the window: AppKit's Touch Bar finder keeps a KVO observer on the window's view, and
+dropping the view under the running run loop made the next display cycle abort the process
+(`-[_NSTouchBarFinderObservation invalidate]`, "Cannot remove an observer …"; PdfCraft #1833).
+`src/quit.rs` cancels the close from `App::logic` — which runs even while the window is
+minimized — and schedules `terminate:` on the main queue with safe `objc2` calls. winit's
+`applicationWillTerminate:` then runs eframe's exit handling, so `on_exit` still saves the job
+list. Other platforms close the window exactly as before.
+
 **Tests.** Headless egui tests cover the transport bar's scan ownership and taps, the filter
 chips (including a real click), the painted rows, the palette contrast, the scrolling panes,
 the details write-back, the details layout in both languages, the pedal wizard's step order
-and guards, the language table and its persistence, both palettes, and the queue/report sentences. End-to-end window tests (M2.4) and the waveform are still open.
+and guards, the language table and its persistence, both palettes, the queue/report sentences,
+and the macOS close takeover. End-to-end window tests (M2.4) and the waveform are still open.

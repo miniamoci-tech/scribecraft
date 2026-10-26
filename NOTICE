@@ -14,6 +14,8 @@ This product includes third-party software and fonts:
 - cpal, Apache-2.0, https://github.com/RustAudio/cpal
 - hound, Apache-2.0, https://github.com/ruuda/hound
 - rfd, MIT, https://github.com/PolyMeilex/rfd
+- objc2, objc2-app-kit and dispatch2, MIT (or Zlib OR Apache-2.0), https://github.com/madsmtm/objc2
+  Used on macOS only, to quit through `-[NSApplication terminate:]`.
 - hidapi (Rust crate MIT; bundled hidapi C library used under its BSD-style licence), https://github.com/ruabmbua/hidapi-rs
 - serialport, Mozilla Public License 2.0, https://github.com/serialport/serialport-rs (unmodified)
 - global-hotkey, MIT OR Apache-2.0, https://github.com/tauri-apps/global-hotkey

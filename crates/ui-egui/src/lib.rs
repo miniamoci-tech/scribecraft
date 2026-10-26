@@ -10,6 +10,7 @@
 mod controls;
 mod i18n;
 mod job_list;
+mod quit;
 mod theme;
 mod transport_bar;
 
@@ -571,6 +572,12 @@ impl App {
 }
 
 impl eframe::App for App {
+    /// Runs before `ui` and also while the window is minimized: the place for a decision that
+    /// must not wait for a frame. Closing the window is one — see [`quit`].
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        quit::take_over_close(ctx);
+    }
+
     fn ui(&mut self, root: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = root.ctx().clone();
         let ctx = &ctx;
