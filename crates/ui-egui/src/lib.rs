@@ -8,17 +8,19 @@
 //! window, F10 copy time stamp · Ctrl+B bookmark · Ctrl+S save.
 
 mod controls;
+mod transport_bar;
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use eframe::egui;
-use scribecraft_engine::transport::{ChannelMode, MAX_SPEED, MIN_SPEED, SpeedPreset, format_timestamp};
+use scribecraft_engine::transport::{ChannelMode, format_timestamp};
 use scribecraft_engine::{Priority, Session, Settings, State, Status, Transport, lock_transport, media, scan_folder};
 use scribecraft_platform::AudioOutput;
 
 use controls::Controls;
+use transport_bar::TransportBar;
 
 /// Opens the main window; `files` are recordings to add and open (from the command line or
 /// the operating system's "Open with").
@@ -37,7 +39,7 @@ struct App {
     transport: Option<Arc<Mutex<Transport>>>,
     message: Option<(String, bool)>,
     bookmark_label: String,
-    scrub: Option<f64>,
+    bar: TransportBar,
     controls: Controls,
 }
 
@@ -65,7 +67,16 @@ impl App {
             None => Session::new(settings.clone()).unwrap_or_default(),
         };
         let controls = Controls::new(ctx, dir.clone());
-        let mut app = Self { session, settings_path, output: None, transport: None, message, bookmark_label: String::new(), scrub: None, controls };
+        let mut app = Self {
+            session,
+            settings_path,
+            output: None,
+            transport: None,
+            message,
+            bookmark_label: String::new(),
+            bar: TransportBar::default(),
+            controls,
+        };
         let mut last = None;
         for f in files {
             last = app.add_file(&f).or(last);
@@ -103,6 +114,7 @@ impl App {
         // Stop the old stream before the old transport goes away.
         self.output = None;
         self.transport = None;
+        self.bar.reset();
         self.controls.set_transport(None);
         match self.session.open(id) {
             Ok(t) => {
@@ -276,79 +288,8 @@ impl App {
             ui.label("Open a dictation to start transcribing.");
             return;
         };
-        let (state, pos, dur, speed, preset) = {
-            let t = lock_transport(&t);
-            (t.state(), t.position_ms(), t.duration_ms(), t.speed(), t.preset())
-        };
-        ui.horizontal(|ui| {
-            ui.monospace(format!("{} / {}", format_timestamp(pos, true), format_timestamp(dur, true)));
-            ui.label(match state {
-                State::Stopped => "stopped",
-                State::Playing => "playing",
-                State::Rewinding => "rewinding",
-                State::FastForwarding => "fast-forwarding",
-            });
-        });
-        // Seek bar: dragging previews the target; releasing seeks.
-        let mut value = self.scrub.unwrap_or(pos as f64);
-        let normal_width = ui.spacing().slider_width;
-        ui.spacing_mut().slider_width = (ui.available_width() - 20.0).max(100.0);
-        let slider = ui.add(egui::Slider::new(&mut value, 0.0..=(dur.max(1) as f64)).show_value(false).trailing_fill(true));
-        ui.spacing_mut().slider_width = normal_width;
-        if slider.dragged() {
-            self.scrub = Some(value);
-        }
-        if slider.drag_stopped() || (slider.changed() && !slider.dragged()) {
-            lock_transport(&t).seek_ms(value as u64);
-            self.scrub = None;
-        }
-        ui.horizontal(|ui| {
-            if ui.button("⏮").on_hover_text("Start").clicked() {
-                lock_transport(&t).seek_ms(0);
-            }
-            let skip = i64::try_from(self.session.settings().skip_ms).unwrap_or(i64::MAX);
-            if ui.button("« 5 s").on_hover_text("Skip back").clicked() {
-                lock_transport(&t).skip_ms(-skip);
-            }
-            let rew = ui.button("⏪").on_hover_text("Rewind (hold) — F7");
-            if rew.is_pointer_button_down_on() {
-                if state != State::Rewinding {
-                    lock_transport(&t).rewind();
-                }
-            } else if state == State::Rewinding && !ui.input(|i| i.key_down(egui::Key::F7)) {
-                lock_transport(&t).release();
-            }
-            let label = if state == State::Playing { "⏸ Stop" } else { "▶ Play" };
-            if ui.add(egui::Button::new(label).min_size(egui::vec2(90.0, 0.0))).on_hover_text("F9").clicked() {
-                lock_transport(&t).toggle_play();
-            }
-            let ff = ui.button("⏩").on_hover_text("Fast-forward (hold) — F8");
-            if ff.is_pointer_button_down_on() {
-                if state != State::FastForwarding {
-                    lock_transport(&t).fast_forward();
-                }
-            } else if state == State::FastForwarding && !ui.input(|i| i.key_down(egui::Key::F8)) {
-                lock_transport(&t).release();
-            }
-            if ui.button("5 s »").on_hover_text("Skip forward").clicked() {
-                lock_transport(&t).skip_ms(skip);
-            }
-            ui.separator();
-            if ui.selectable_label(preset == SpeedPreset::Slow, "Slow").on_hover_text("F5").clicked() {
-                lock_transport(&t).toggle_slow();
-            }
-            if ui.selectable_label(preset == SpeedPreset::Fast, "Fast").on_hover_text("F6").clicked() {
-                lock_transport(&t).toggle_fast();
-            }
-            let mut pct = speed * 100.0;
-            let r = ui.add(egui::Slider::new(&mut pct, MIN_SPEED * 100.0..=MAX_SPEED * 100.0).suffix(" %").text("speed"));
-            if r.changed() {
-                let _ = lock_transport(&t).set_speed((pct / 100.0).clamp(MIN_SPEED, MAX_SPEED));
-            }
-            if ui.button("100 %").clicked() {
-                let _ = lock_transport(&t).set_speed(1.0);
-            }
-        });
+        let skip = self.session.settings().skip_ms;
+        self.bar.show(ui, &t, skip);
     }
 
     fn settings_row(&mut self, ui: &mut egui::Ui) {

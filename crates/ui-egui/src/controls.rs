@@ -434,7 +434,12 @@ impl Controls {
             changed = true;
         }
         if let Some(i) = learning {
-            ui.colored_label(ui.visuals().warn_fg_color, format!("Release every pedal, then press pedal {} now…", i + 1));
+            let prompt = if c.learning_armed() {
+                format!("Press pedal {} now…", i + 1)
+            } else {
+                "Release every pedal first; learning starts when they are all up.".to_owned()
+            };
+            ui.colored_label(ui.visuals().warn_fg_color, prompt);
             if ui.button("Cancel learning").clicked() {
                 c.cancel_learning();
             }

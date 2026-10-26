@@ -232,6 +232,9 @@ pub struct PedalController {
     down: [bool; MAX_PEDALS],
     last: Vec<u8>,
     learning: Option<usize>,
+    /// Learning waits until every configured pedal is up, so the release of a pedal that was
+    /// held when Learn was clicked is not mistaken for a press (see [`PedalController::feed`]).
+    learn_armed: bool,
 }
 
 impl PedalController {
@@ -250,6 +253,7 @@ impl PedalController {
         self.config = config;
         self.down = [false; MAX_PEDALS];
         self.learning = None;
+        self.learn_armed = false;
         Ok(())
     }
 
@@ -264,13 +268,14 @@ impl PedalController {
     }
 
     /// Starts learning button `index` (creating it, as [`PedalAction::None`], if it is the
-    /// next one): release every pedal, then press the one to learn. The next report that
-    /// differs from the current one assigns its bit.
+    /// next one): release every pedal, then press the one to learn. Learning arms once every
+    /// configured pedal is up; the next report that changes a bit from up to down assigns it.
     pub fn start_learning(&mut self, index: usize) -> Result<()> {
         if index > self.config.buttons.len() || index >= MAX_PEDALS {
             return Err(EngineError::Invalid(format!("pedal {index} cannot be learned (next free pedal is {})", self.config.buttons.len())));
         }
         self.learning = Some(index);
+        self.learn_armed = !self.current(&self.last).iter().any(|down| *down);
         Ok(())
     }
 
@@ -278,36 +283,34 @@ impl PedalController {
         self.learning
     }
 
-    pub fn cancel_learning(&mut self) {
-        self.learning = None;
+    /// Whether learning may take the next press: every configured pedal was up in the last
+    /// report. False while a pedal is still held from before Learn was clicked.
+    pub fn learning_armed(&self) -> bool {
+        self.learning.is_some() && self.learn_armed
     }
 
-    /// Feeds one report. Applies press/release events to `transport` when given (and not
-    /// learning). Total for any input bytes.
+    pub fn cancel_learning(&mut self) {
+        self.learning = None;
+        self.learn_armed = false;
+    }
+
+    /// Feeds one report. Applies press/release events to `transport` when given; while
+    /// learning, the pedal being learned does not run its old action. Total for any input
+    /// bytes.
     pub fn feed(&mut self, report: &[u8], transport: Option<&mut Transport>) -> Feed {
         let report = report.get(..report.len().min(MAX_REPORT_BYTES)).unwrap_or(&[]);
         let mut feed = Feed::default();
-        if let Some(index) = self.learning {
-            // The changed bit must go from "up" to "down" (a release while learning is ignored).
-            if let Some(bit) = learn_bit(&self.last, report)
-                && !bit.is_pressed(&self.last)
-                && bit.is_pressed(report)
-            {
-                let button = PedalButton { bit, action: PedalAction::None };
-                match self.config.buttons.get_mut(index) {
-                    Some(b) => b.bit = bit,
-                    None => self.config.buttons.push(button),
-                }
-                self.learning = None;
-                feed.learned = Some((index, bit));
-            }
-            self.last = report.to_vec();
-            self.down = self.current(report);
-            return feed;
-        }
         let now = self.current(report);
+        // The first bit that changed, if any. A single pair of reports cannot tell a press
+        // from a release (flipping the polarity explains either), so learning only takes a
+        // change once it has seen every pedal up: that makes the next change the press.
+        let changed_bit = learn_bit(&self.last, report);
+
+        // Events from the configuration as it is before any learning change: a pedal being
+        // learned must not also fire whatever it was bound to.
         for (i, (was, is)) in self.down.iter().zip(now.iter()).enumerate() {
             if was != is
+                && self.learning != Some(i)
                 && let Some(b) = self.config.buttons.get(i)
             {
                 feed.events.push(PedalEvent { button: i, pressed: *is, action: b.action });
@@ -315,6 +318,32 @@ impl PedalController {
         }
         self.down = now;
         self.last = report.to_vec();
+
+        if let Some(index) = self.learning {
+            if !self.learn_armed {
+                // Wait for a report with every configured pedal up before accepting a change.
+                if !now.iter().any(|down| *down) {
+                    self.learn_armed = true;
+                }
+            } else if let Some(bit) = changed_bit {
+                // A bit another pedal already uses is not learned again. Rejecting a change
+                // waits for every pedal to come up before taking another one.
+                let taken = self.config.buttons.iter().enumerate().any(|(i, b)| i != index && b.bit.byte == bit.byte && b.bit.mask == bit.mask);
+                if taken {
+                    self.learn_armed = false;
+                } else {
+                    match self.config.buttons.get_mut(index) {
+                        Some(b) => b.bit = bit,
+                        None => self.config.buttons.push(PedalButton { bit, action: PedalAction::None }),
+                    }
+                    self.learning = None;
+                    self.learn_armed = false;
+                    self.down = self.current(report);
+                    feed.learned = Some((index, bit));
+                }
+            }
+        }
+
         if let Some(t) = transport {
             for e in &feed.events {
                 apply(e.action, e.pressed, self.config.play_mode, t);
@@ -453,6 +482,53 @@ mod tests {
         c.feed(&[0xff], Some(&mut t));
         c.feed(&[0xfe], Some(&mut t));
         assert_eq!(t.state(), State::Rewinding);
+    }
+
+    #[test]
+    fn learning_waits_for_every_pedal_to_be_released() {
+        // Regression: releasing the pedal that was held when Learn was clicked used to be
+        // read as an active-low press and stored as a duplicate of that same bit.
+        let mut c = PedalController::new(PedalConfig::serial_default("COM1")).unwrap();
+        c.feed(&[SERIAL_DCD], None); // the play pedal is held when "Learn a new pedal" is clicked
+        c.start_learning(4).unwrap();
+        assert!(!c.learning_armed(), "learning must wait for the held pedal to come up");
+
+        assert_eq!(c.feed(&[0], None).learned, None, "the release is not a new pedal");
+        assert_eq!(c.learning(), Some(4));
+        assert_eq!(c.config().buttons.len(), 4, "no duplicate pedal");
+        assert!(c.learning_armed());
+
+        let f = c.feed(&[0x10], None);
+        assert_eq!(f.learned, Some((4, InputBit { byte: 0, mask: 0x10, active_low: false })));
+    }
+
+    #[test]
+    fn learning_ignores_a_bit_that_another_pedal_already_uses() {
+        let mut c = PedalController::new(PedalConfig::serial_default("COM1")).unwrap();
+        c.feed(&[0], None);
+        c.start_learning(4).unwrap();
+        assert_eq!(c.feed(&[SERIAL_DSR], None).learned, None, "pin 6 already rewinds");
+        assert_eq!(c.learning(), Some(4));
+        assert!(!c.learning_armed(), "a refused change waits for a clean release");
+
+        c.feed(&[0], None);
+        assert!(c.learning_armed());
+        let f = c.feed(&[0x10], None);
+        assert_eq!(f.learned, Some((4, InputBit { byte: 0, mask: 0x10, active_low: false })));
+    }
+
+    #[test]
+    fn configuring_a_pedal_does_not_leave_playback_running() {
+        // Releasing another pedal while learning must still reach the transport, or a Play
+        // pedal held when Learn was clicked would keep playing after it came up.
+        let mut c = PedalController::new(PedalConfig::serial_default("COM1")).unwrap();
+        let mut t = transport();
+        c.feed(&[0], Some(&mut t));
+        c.feed(&[SERIAL_DCD], Some(&mut t));
+        assert_eq!(t.state(), State::Playing);
+        c.start_learning(4).unwrap();
+        c.feed(&[0], Some(&mut t));
+        assert_eq!(t.state(), State::Stopped, "the play pedal's release stops playback");
     }
 
     #[test]
