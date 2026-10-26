@@ -6,6 +6,16 @@ name: release
 
 on:
   workflow_dispatch:
+    inputs:
+      macos_runner:
+        description: 'Label del runner macOS (usa *-intel se arm64 e in coda)'
+        type: choice
+        default: macos-15
+        options:
+          - macos-15
+          - macos-26
+          - macos-15-intel
+          - macos-26-intel
   push:
     tags: ["v*"]
 
@@ -18,6 +28,7 @@ env:
 jobs:
   windows:
     runs-on: windows-2022
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -32,7 +43,10 @@ jobs:
             dist/*-setup.exe
 
   macos:
-    runs-on: macos-14
+    # macos-14 e' dismesso dal 2 novembre 2026.
+    # Su un tag non esistono input, quindi il default resta macos-15.
+    runs-on: ${{ inputs.macos_runner || 'macos-15' }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -46,6 +60,7 @@ jobs:
 
   linux:
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
