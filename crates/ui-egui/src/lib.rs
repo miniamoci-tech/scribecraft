@@ -8,6 +8,7 @@
 //! window, F10 copy time stamp · Ctrl+B bookmark · Ctrl+S save.
 
 mod controls;
+mod job_list;
 mod theme;
 mod transport_bar;
 
@@ -21,6 +22,7 @@ use scribecraft_engine::{Priority, Session, Settings, State, Status, Transport, 
 use scribecraft_platform::AudioOutput;
 
 use controls::Controls;
+use job_list::Filter;
 use transport_bar::TransportBar;
 
 /// Opens the main window; `files` are recordings to add and open (from the command line or
@@ -42,6 +44,7 @@ struct App {
     bookmark_label: String,
     bar: TransportBar,
     controls: Controls,
+    filter: Filter,
 }
 
 impl App {
@@ -78,6 +81,7 @@ impl App {
             bookmark_label: String::new(),
             bar: TransportBar::default(),
             controls,
+            filter: Filter::default(),
         };
         let mut last = None;
         for f in files {
@@ -263,30 +267,39 @@ impl App {
     }
 
     fn job_list(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Dictations");
         let open_id = self.session.open_id();
-        let rows: Vec<(u64, String, String, Priority, Status, Option<u64>)> =
-            self.session.jobs().queue().iter().map(|d| (d.id, d.title.clone(), d.author.clone(), d.priority, d.status, d.duration_ms)).collect();
+        let rows: Vec<job_list::Row> = self.session.jobs().queue().iter().map(|d| job_list::Row::of(d)).collect();
+        ui.horizontal(|ui| {
+            ui.heading("Dictations");
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.weak(format!("{} in queue", rows.len()));
+            });
+        });
+        ui.add_space(4.0);
+        job_list::chips(ui, &mut self.filter, &rows);
         if rows.is_empty() {
+            ui.add_space(6.0);
             ui.label("No dictations yet. Use “Add recordings…” or drop files on the window.");
+            return;
         }
         let mut open = None;
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            for (id, title, author, priority, status, duration) in rows {
-                let text = format!(
-                    "{}{}\n{} · {} · {}{}",
-                    priority_mark(priority),
-                    title,
-                    status_name(status),
-                    duration.map(|d| format_timestamp(d, false)).unwrap_or_else(|| "--:--:--".into()),
-                    if author.is_empty() { "no author" } else { &author },
-                    "",
-                );
-                if ui.selectable_label(open_id == Some(id), text).clicked() && open_id != Some(id) {
-                    open = Some(id);
+        let mut shown = 0usize;
+        egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+            for row in &rows {
+                if !self.filter.matches(row.status) {
+                    continue;
                 }
+                shown += 1;
+                if job_list::row(ui, row, open_id == Some(row.id)).clicked() && open_id != Some(row.id) {
+                    open = Some(row.id);
+                }
+                ui.add_space(2.0);
             }
         });
+        if shown == 0 {
+            ui.add_space(6.0);
+            ui.label(format!("Nothing under “{}”. Pick “All” to see the whole queue.", self.filter.label()));
+        }
         if let Some(id) = open {
             self.open(id);
         }
@@ -378,9 +391,9 @@ impl App {
                         ui.selectable_value(&mut job.priority, p, format!("{p:?}"));
                     }
                 });
-                egui::ComboBox::from_label("status").selected_text(status_name(job.status)).show_ui(ui, |ui| {
+                egui::ComboBox::from_label("status").selected_text(job_list::status_name(job.status)).show_ui(ui, |ui| {
                     for s in [Status::New, Status::InProgress, Status::Done, Status::Dispatched] {
-                        ui.selectable_value(&mut job.status, s, status_name(s));
+                        ui.selectable_value(&mut job.status, s, job_list::status_name(s));
                     }
                 });
                 ui.label("Due");
@@ -494,23 +507,6 @@ fn field(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
         ui.label(egui::RichText::new(label).color(theme::MUTED));
         add(ui);
     });
-}
-
-fn priority_mark(p: Priority) -> &'static str {
-    match p {
-        Priority::Urgent => "‼ ",
-        Priority::High => "! ",
-        Priority::Normal | Priority::Low => "",
-    }
-}
-
-fn status_name(s: Status) -> &'static str {
-    match s {
-        Status::New => "new",
-        Status::InProgress => "in progress",
-        Status::Done => "done",
-        Status::Dispatched => "dispatched",
-    }
 }
 
 fn channel_name(m: ChannelMode) -> &'static str {

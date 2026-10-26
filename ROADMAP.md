@@ -2,11 +2,12 @@
 
 **Stage: pre-alpha** · next: alpha (global hotkeys + pedals) · parity 17/45 (weighted ≈ 46 %, ready for real work ≈ 25 %)
 
-> **Last reviewed:** 2026-10-25 · **Last updated:** 2026-10-25 · **Change:** fixed pedal / hotkey fast-forward; restyle phase 1 (theme, transport dock) · **Target:** Express Scribe Pro (public feature description)
+> **Last reviewed:** 2026-10-25 · **Last updated:** 2026-10-25 · **Change:** fixed pedal / hotkey fast-forward; restyle phase 2 (job-list filters and rows) · **Target:** Express Scribe Pro (public feature description)
 
 - Milestones: [`docs/roadmap.md`](docs/roadmap.md) · Gaps: [`docs/gaps.md`](docs/gaps.md) · Measurement: [`docs/target-app-parity.md`](docs/target-app-parity.md)
 
 ## Progress log
+- 2026-10-25 — Restyle phase 2: the queue has filter chips (All / To do / In progress / Done / Sent) with live counts that keep only the matching jobs, and hand-painted rows with a red or amber priority stripe, an elided title, status · author and a right-aligned duration. Metadata stays on WCAG-AA colours on hover and on the open row. A headless test clicks the Done chip and checks the queue narrows to finished work. Phase 3 (details panel) next.
 - 2026-10-25 — Restyle phase 1: one dark palette and widget style in `theme.rs`, contrast-checked by tests; the transport moved into a card dock at the bottom with a large monospaced clock, a state pill that names the scan rate, time remaining, bookmark marks on the seek bar and an accent playhead. The open dictation's pane scrolls on short windows. Phase 2 (job-list filters and chips) next.
 - 2026-10-25 — Fix: the transport bar ended any scan not backed by its own button or F8, so a fast-forward started by a foot pedal or a system-wide key stopped after one frame (play was unaffected). The bar now ends only a scan it started; holding ⏪/⏩ scans and a tap skips by the configured amount. Pedal learning waits until every pedal is released and refuses a bit another pedal already uses, so releasing a pedal held while Learn was clicked no longer stores a duplicate. First headless UI tests (transport bar).
 - 2026-10-20 — M3: foot pedals on USB (HID, learned with one press) and serial COM ports (NCH public wiring defaults), system-wide hotkeys (F7/F8 hold, F9, F4, F6; remappable) that work while the word processor is in front; `scribecraft-cli pedal list|monitor`; pedal automation tools. Checked by hand on Windows 10; no physical pedal yet.
