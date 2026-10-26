@@ -282,7 +282,7 @@ tier = "P0"
 milestone = "M3"
 status = "partial"
 tools = ["pedal_config_set", "pedal_report", "pedal_learn", "pedal_config_get"]
-evidence = ["crates/engine/src/pedal.rs::serial_pedal_hold_to_play_with_backstep_and_rewind_while_held", "crates/engine/src/pedal.rs::learning_finds_the_pressed_bit_including_active_low_pedals", "crates/engine/src/pedal.rs::an_active_low_pedal_can_be_learned_and_used", "crates/engine/src/pedal.rs::learning_waits_for_every_pedal_to_be_released", "crates/engine/src/pedal.rs::learning_ignores_a_bit_that_another_pedal_already_uses", "crates/automation/tests/automation.rs::serial_foot_pedal_drives_playback_end_to_end", "crates/platform/src/pedal.rs::a_missing_device_reports_waiting_and_stops_promptly", "crates/platform/src/pedal.rs::keyboards_and_mice_are_never_pedals"]
+evidence = ["crates/engine/src/pedal.rs::serial_pedal_hold_to_play_with_backstep_and_rewind_while_held", "crates/engine/src/pedal.rs::learning_finds_the_pressed_bit_including_active_low_pedals", "crates/engine/src/pedal.rs::an_active_low_pedal_can_be_learned_and_used", "crates/engine/src/pedal.rs::learning_waits_for_every_pedal_to_be_released", "crates/engine/src/pedal.rs::learning_ignores_a_bit_that_another_pedal_already_uses", "crates/automation/tests/automation.rs::serial_foot_pedal_drives_playback_end_to_end", "crates/platform/src/pedal.rs::a_missing_device_reports_waiting_and_stops_promptly", "crates/platform/src/pedal.rs::keyboards_and_mice_are_never_pedals", "crates/platform/src/pedal.rs::a_device_named_like_a_keyboard_or_mouse_is_refused_whatever_its_usage", "crates/platform/src/pedal.rs::a_saved_keyboard_is_never_opened"]
 notes = "USB HID pedals (any model: each pedal is learned with one press; known pedal makers are listed first) and serial COM pedals read from the modem lines with DTR raised, using NCH's public wiring note as the default (pin 1 DCD play, pin 6 DSR rewind, pins 8 CTS / 9 RI fast-forward). Learning waits until every pedal is up and ignores a bit another pedal already uses, so a pedal held while Learn is clicked is not stored twice. Play while held or press to toggle; rewind and fast-forward while held; reconnects after unplugging; works while another program is in front. Not yet: tested with a physical pedal, game-port pedals, a udev rule for HID access on Linux. Keyboards and mice are never listed or opened."
 
 [[feature]]
@@ -292,9 +292,9 @@ area = "C"
 tier = "P2"
 milestone = "M3"
 status = "partial"
-tools = ["pedal_learn"]
-evidence = ["crates/engine/src/pedal.rs::learning_finds_the_pressed_bit_including_active_low_pedals"]
-notes = "The Pedal and keys window lists devices, shows each pedal live, learns a pedal by pressing it and sets its function; scribecraft-cli pedal list / pedal monitor for diagnosis. Not a step-by-step wizard yet."
+tools = ["pedal_config_get", "pedal_config_set", "pedal_learn", "pedal_report"]
+evidence = ["crates/ui-egui/src/controls.rs::the_pedal_wizard_walks_its_steps_in_order", "crates/ui-egui/src/controls.rs::reopening_the_wizard_returns_to_the_first_step", "crates/ui-egui/src/controls.rs::choosing_a_device_sets_the_pedals_it_starts_from", "crates/automation/tests/automation.rs::serial_foot_pedal_drives_playback_end_to_end"]
+notes = "The Pedal tab opens a guided setup in three steps: choose the device, press each pedal once, choose what it does. The step counter, Back and a Next button that waits for a device and at least one learned pedal; steps cannot be skipped ahead, so a function is never assigned to a pedal that was not learned. It writes the same pedal.json as the advanced tab, which shares the device list, the play-mode choice and the pedal table, and the lists scroll. The advanced tab stays for diagnosis (live state, last report, learning one pedal again), with scribecraft-cli pedal list / pedal monitor. Not yet: checked with a physical pedal; the tests drive the step order and the configuration each choice produces, not a real window click."
 
 [[feature]]
 id = "ctl.speechmike"

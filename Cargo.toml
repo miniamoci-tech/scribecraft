@@ -42,6 +42,11 @@ global-hotkey = "0.9"
 # ui
 eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow", "accesskit", "wayland", "x11"] }
 rfd = "0.17"
+# Quit through `-[NSApplication terminate:]` on macOS, where closing the window crashes AppKit's
+# Touch Bar finder (MIT; see crates/ui-egui/src/quit.rs). macOS only.
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["NSApplication"] }
+dispatch2 = "0.3"
 
 # testing
 proptest = "1"
