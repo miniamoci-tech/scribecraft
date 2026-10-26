@@ -315,8 +315,8 @@ tier = "P0"
 milestone = "M0"
 status = "shipped"
 tools = ["dictation_add", "dictation_list", "dictation_remove", "jobs_load", "jobs_save"]
-evidence = ["crates/engine/src/jobs.rs::add_save_load_round_trip_and_queue_order", "crates/engine/src/jobs.rs::missing_is_empty_and_corrupt_is_an_error_that_keeps_the_file", "crates/automation/tests/automation.rs::transcription_workflow_end_to_end"]
-notes = "Atomic JSON file; a corrupt file is reported and never overwritten. Not yet: folders/tabs, column sorting, search."
+evidence = ["crates/engine/src/jobs.rs::add_save_load_round_trip_and_queue_order", "crates/engine/src/jobs.rs::missing_is_empty_and_corrupt_is_an_error_that_keeps_the_file", "crates/engine/src/session.rs::removing_a_dictation_closes_it_and_keeps_the_recording", "crates/automation/tests/automation.rs::transcription_workflow_end_to_end", "crates/automation/tests/automation.rs::removing_the_open_dictation_stops_it_and_keeps_the_recording", "crates/ui-egui/src/lib.rs::removing_a_dictation_asks_first_and_can_be_cancelled"]
+notes = "Atomic JSON file; a corrupt file is reported and never overwritten. A dictation can be marked completed (or back to do) and removed from the queue from a row's right-click menu or the details panel, always after a confirmation, or with dictation_remove; the open transport is let go first and the recording file is never deleted. Selecting a row only opens it (it resumes where it was left) and never starts playback. Not yet: folders/tabs, column sorting, search."
 
 [[feature]]
 id = "job.metadata"

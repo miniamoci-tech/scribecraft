@@ -14,6 +14,7 @@
 | M7 | Packaging polish: signing, notarization, FreeBSD, web | packaging scripts exist |
 
 ## Revision history
+- 2026-10-26 — M2: selecting a queue row only opens the dictation and leaves playback stopped; the details panel can remove a job from the list after a confirmation, without deleting its recording file (`Session::remove`, `dictation_remove`).
 - 2026-10-26 — M2: on macOS the window closes through `-[NSApplication terminate:]` instead of letting eframe drop it, which crashed AppKit's Touch Bar finder (PdfCraft #1833); the job list is still saved by `on_exit`.
 - 2026-10-25 — M2: light and dark palettes, chosen in the toolbar and remembered in `ui.json`, and a toolbar that wraps at the 640 pt minimum width.
 - 2026-10-25 — M2: the interface speaks English and Italian; the language is chosen in the toolbar and saved in `ui.json`.

@@ -59,6 +59,26 @@ fn transcription_workflow_end_to_end() {
 }
 
 #[test]
+fn removing_the_open_dictation_stops_it_and_keeps_the_recording() {
+    let dir = root("remove");
+    let mut r = Runner::new(&dir).unwrap();
+    call(&mut r, "synth_dictation", json!({ "out": "note.wav", "seconds": 2 }));
+    let id = call(&mut r, "dictation_add", json!({ "path": "note.wav", "author": "Dr. Example" }))["id"].as_u64().unwrap();
+    call(&mut r, "dictation_open", json!({ "id": id }));
+    assert!(dir.join("note.wav").exists());
+
+    let removed = call(&mut r, "dictation_remove", json!({ "id": id }));
+    assert_eq!(removed["removed"], id);
+    assert_eq!(call(&mut r, "dictation_list", json!({})), json!([]), "the row is gone");
+    assert!(dir.join("note.wav").exists(), "the recording file is kept");
+    let err = r.call("transport_status", &json!({})).unwrap_err();
+    assert!(err.message.contains("open"), "the transport must not outlive the job: {err}");
+    let err = r.call("dictation_remove", &json!({ "id": id })).unwrap_err();
+    assert!(err.message.contains(&id.to_string()), "removing it twice must say which id is unknown: {err}");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
 fn paths_outside_the_root_are_refused() {
     let dir = root("confine");
     let outside = dir.with_file_name(format!("scribecraft-outside-{}.wav", std::process::id()));

@@ -20,6 +20,13 @@ and the tests check both languages use the same placeholders. Strings that come 
 engine, the platform or a device (decoder errors, hotkey names, a pedal's own path) stay as
 the system or file gives them.
 
+**Selecting and removing.** A click on a queue row only opens it: it resumes at its saved
+position and the transport stays stopped, so picking a job never plays it into the room; Play
+starts it. A right click on a row offers "Mark as completed" ("Mark as still to do" on finished work) and "Remove from list…", which asks in a confirmation window for a job that is not open. The details panel can also drop the open job from the queue: "Remove from list…" asks
+"Remove “…” from the list?" and says the recording itself is not deleted. Nothing is removed by
+one click; Escape or Cancel leaves the job alone, and the file on disk is never touched. The
+same removal is the `dictation_remove` automation tool.
+
 **Quitting.** On macOS the window closes through `-[NSApplication terminate:]`, never by letting
 eframe drop the window: AppKit's Touch Bar finder keeps a KVO observer on the window's view, and
 dropping the view under the running run loop made the next display cycle abort the process
@@ -31,6 +38,7 @@ list. Other platforms close the window exactly as before.
 
 **Tests.** Headless egui tests cover the transport bar's scan ownership and taps, the filter
 chips (including a real click), the painted rows, the palette contrast, the scrolling panes,
-the details write-back, the details layout in both languages, the pedal wizard's step order
+the details write-back, the details layout in both languages, the removal question (a click
+asks, Cancel cancels, only Confirm removes) in both languages, the pedal wizard's step order
 and guards, the language table and its persistence, both palettes, the queue/report sentences,
 and the macOS close takeover. End-to-end window tests (M2.4) and the waveform are still open.

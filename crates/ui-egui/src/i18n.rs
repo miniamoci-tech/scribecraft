@@ -143,6 +143,22 @@ pub(crate) fn copied(text: &str, lang: Lang) -> String {
     fill(Text::Copied.in_lang(lang), &[("{text}", text)])
 }
 
+/// The report after removing a dictation from the list (the recording file stays).
+pub(crate) fn removed(title: &str, lang: Lang) -> String {
+    fill(Text::Removed.in_lang(lang), &[("{title}", title)])
+}
+
+/// The report after the queue's right-click menu changed a dictation's status.
+pub(crate) fn marked(title: &str, done: bool, lang: Lang) -> String {
+    let text = if done { Text::MarkedDone } else { Text::MarkedToDo };
+    fill(text.in_lang(lang), &[("{title}", title)])
+}
+
+/// The question the details panel asks before removing a dictation.
+pub(crate) fn remove_question(title: &str, lang: Lang) -> String {
+    fill(Text::RemoveQuestion.in_lang(lang), &[("{title}", title)])
+}
+
 /// The report after marking a bookmark.
 pub(crate) fn bookmark_at(time: &str, lang: Lang) -> String {
     fill(Text::BookmarkAt.in_lang(lang), &[("{time}", time)])
@@ -278,6 +294,17 @@ texts! {
     NoBookmarks => "None yet. Ctrl+B marks the playhead." | "Nessuno. Ctrl+B segna il punto di riproduzione.",
     JumpHere => "Jump here" | "Vai qui",
 
+    // Removing a dictation from the list (the recording file stays).
+    RemoveDictation => "Remove from list…" | "Rimuovi dalla coda…",
+    RemoveHint => "The recording file stays on disk" | "Il file audio resta sul disco",
+    RemoveQuestion => "Remove “{title}” from the list?" | "Rimuovere «{title}» dalla coda?",
+    RemoveKeepsFile => "The recording itself is not deleted." | "La registrazione non viene cancellata.",
+    RemoveConfirm => "Remove" | "Rimuovi",
+    Cancel => "Cancel" | "Annulla",
+    // The right-click menu of a queue row.
+    MarkDone => "Mark as completed" | "Segna come completata",
+    MarkToDo => "Mark as still to do" | "Riporta tra le da fare",
+
     // Notes and the open recording.
     Notes => "NOTES" | "NOTE",
     NotesHint => "Anything to remember while transcribing" | "Qualcosa da ricordare durante la trascrizione",
@@ -397,6 +424,9 @@ texts! {
     NotSupported => "{path} is not a supported recording" | "{path} non è una registrazione supportata",
     AddedOne => "added 1 recording" | "aggiunta 1 registrazione",
     AddedMany => "added {n} recordings" | "aggiunte {n} registrazioni",
+    Removed => "removed “{title}” from the list" | "«{title}» rimossa dalla coda",
+    MarkedDone => "“{title}” marked as completed" | "«{title}» segnata come completata",
+    MarkedToDo => "“{title}” is back among the work to do" | "«{title}» riportata tra le da fare",
 }
 
 #[cfg(test)]

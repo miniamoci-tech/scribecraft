@@ -154,10 +154,7 @@ fn dictation_update(r: &mut Runner, a: &Value) -> Result<Value, String> {
 
 fn dictation_remove(r: &mut Runner, a: &Value) -> Result<Value, String> {
     let id = args::u64(a, "id")?;
-    if r.session.open_id() == Some(id) {
-        r.session.close();
-    }
-    r.session.jobs_mut().remove(id).map_err(err)?;
+    r.session.remove(id).map_err(err)?;
     Ok(json!({ "removed": id }))
 }
 

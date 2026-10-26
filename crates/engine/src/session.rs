@@ -139,6 +139,18 @@ impl Session {
         Ok(ms)
     }
 
+    /// Removes dictation `id` from the list. If it is the open one, its transport is let go
+    /// first, so a stream cannot outlive the job it reads. The recording file itself is never
+    /// touched: a transcriptionist can always add it back.
+    pub fn remove(&mut self, id: u64) -> Result<Dictation> {
+        let job = self.jobs.remove(id)?;
+        if self.open.as_ref().is_some_and(|(open, _)| *open == id) {
+            self.open = None;
+        }
+        self.dirty = true;
+        Ok(job)
+    }
+
     /// Closes the open dictation, remembering where playback was.
     pub fn close(&mut self) {
         if let Some((id, t)) = self.open.take() {
@@ -192,6 +204,32 @@ mod tests {
         assert_eq!((job.status, job.position_ms, job.duration_ms, job.title.as_str()), (Status::InProgress, 2_000, Some(3_000), "interview"));
         again.open(id).unwrap();
         assert_eq!(again.with_transport(|t| t.position_ms()).unwrap(), 2_000);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Removing the open dictation lets its transport go, so dropping a job cannot leave a
+    /// stream reading a file the list no longer knows about. The recording stays on disk, and
+    /// removing an unknown id is an error that leaves the list untouched.
+    #[test]
+    fn removing_a_dictation_closes_it_and_keeps_the_recording() {
+        let dir = std::env::temp_dir().join(format!("scribecraft-remove-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let wav = dir.join("note.wav");
+        write_wav(&wav, &synth::dictation(8_000, 2, 2.0), WavFormat::Pcm16).unwrap();
+        let mut s = Session::new(Settings::default()).unwrap();
+        let id = s.add_file(&wav, None, "Author A").unwrap();
+        s.open(id).unwrap();
+        assert_eq!(s.open_id(), Some(id));
+
+        let removed = s.remove(id).unwrap();
+        assert_eq!(removed.id, id);
+        assert_eq!(s.open_id(), None, "no transport may outlive the job");
+        assert!(s.jobs().is_empty());
+        assert!(s.is_dirty(), "the list changed and must be saved");
+        assert!(wav.exists(), "the recording itself is never deleted");
+
+        assert!(matches!(s.remove(id), Err(EngineError::NoSuchDictation(_))));
+        assert!(wav.exists());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
