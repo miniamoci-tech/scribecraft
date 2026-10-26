@@ -25,6 +25,7 @@ use scribecraft_platform::AudioOutput;
 use controls::Controls;
 use i18n::{Lang, Text};
 use job_list::Filter;
+use theme::Theme;
 use transport_bar::TransportBar;
 
 /// Opens the main window; `files` are recordings to add and open (from the command line or
@@ -40,9 +41,10 @@ pub fn run(files: Vec<PathBuf>) -> Result<(), String> {
 struct App {
     session: Session,
     settings_path: Option<PathBuf>,
-    /// Where the language choice is kept, next to the job list.
+    /// Where the language and theme choices are kept, next to the job list.
     ui_path: Option<PathBuf>,
     lang: Lang,
+    theme: Theme,
     output: Option<AudioOutput>,
     transport: Option<Arc<Mutex<Transport>>>,
     message: Option<(String, bool)>,
@@ -54,10 +56,12 @@ struct App {
 
 impl App {
     fn new(ctx: egui::Context, files: Vec<PathBuf>) -> Self {
-        theme::apply(&ctx);
         let dir = scribecraft_platform::data_dir();
         let ui_path = dir.as_ref().map(|d| d.join("ui.json"));
-        let lang = ui_path.as_deref().map_or_else(Lang::default, |p| i18n::Preferences::load(p).lang);
+        let saved = ui_path.as_deref().map_or_else(i18n::Preferences::default, i18n::Preferences::load);
+        let (lang, theme) = (saved.lang, saved.theme);
+        // After reading the choice, so the first frame is already in the right palette.
+        theme::apply(&ctx, theme);
         let mut message = None;
         if let Some(d) = &dir
             && let Err(e) = std::fs::create_dir_all(d)
@@ -84,6 +88,7 @@ impl App {
             settings_path,
             ui_path,
             lang,
+            theme,
             output: None,
             transport: None,
             message,
@@ -109,11 +114,11 @@ impl App {
         });
     }
 
-    /// Remembers the language for the next start. A failure is reported but never stops the
-    /// interface: the choice still applies until the window closes.
-    fn save_language(&mut self) {
+    /// Remembers the language and the theme for the next start. A failure is reported but
+    /// never stops the interface: the choice still applies until the window closes.
+    fn save_preferences(&mut self) {
         let Some(path) = self.ui_path.clone() else { return };
-        if let Err(e) = (i18n::Preferences { lang: self.lang }).save(&path) {
+        if let Err(e) = (i18n::Preferences { lang: self.lang, theme: self.theme }).save(&path) {
             self.report(Err(e));
         }
     }
@@ -247,12 +252,14 @@ impl App {
 
     fn toolbar(&mut self, ui: &mut egui::Ui) {
         let lang = self.lang;
-        ui.horizontal(|ui| {
+        // Wrapped: at the window's minimum width (640 pt) the buttons and both pickers do not
+        // fit on one line, and a plain row would push the last of them out of the window.
+        ui.horizontal_wrapped(|ui| {
             brand(ui);
             ui.add_space(6.0);
-            let add = egui::Button::new(egui::RichText::new(Text::AddRecordings.in_lang(lang)).strong().color(theme::ACCENT_INK))
-                .fill(theme::ACCENT)
-                .stroke(egui::Stroke::new(1.0, theme::ACCENT))
+            let add = egui::Button::new(egui::RichText::new(Text::AddRecordings.in_lang(lang)).strong().color(theme::accent_ink()))
+                .fill(theme::accent())
+                .stroke(egui::Stroke::new(1.0, theme::accent()))
                 .corner_radius(8);
             if ui.add(add).on_hover_text(Text::AddRecordingsHint.in_lang(lang)).clicked()
                 && let Some(files) = rfd::FileDialog::new().add_filter(Text::RecordingsFilter.in_lang(lang), media::SUPPORTED_EXTENSIONS).pick_files()
@@ -301,12 +308,20 @@ impl App {
                 }
             });
             picker.response.on_hover_text(Text::LanguageHint.in_lang(lang));
-            if self.lang != before {
-                self.save_language();
-            }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.weak(Text::ToolbarKeys.in_lang(lang)).on_hover_text(self.controls.key_hint(lang));
+            let theme_before = self.theme;
+            let theme_picker = egui::ComboBox::from_id_salt("theme").selected_text(self.theme.label(lang)).width(76.0).show_ui(ui, |ui| {
+                for candidate in Theme::ALL {
+                    ui.selectable_value(&mut self.theme, candidate, candidate.label(lang));
+                }
             });
+            theme_picker.response.on_hover_text(Text::ThemeHint.in_lang(lang));
+            if self.theme != theme_before {
+                theme::apply(ui.ctx(), self.theme);
+            }
+            if self.lang != before || self.theme != theme_before {
+                self.save_preferences();
+            }
+            ui.weak(Text::ToolbarKeys.in_lang(lang)).on_hover_text(self.controls.key_hint(lang));
         });
     }
 
@@ -357,8 +372,8 @@ impl App {
             theme::card_frame().show(ui, |ui| {
                 ui.set_min_width(ui.available_width());
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(Text::NoOpen.in_lang(lang)).strong().color(theme::TEXT));
-                    ui.label(egui::RichText::new(Text::AddOrOpen.in_lang(lang)).color(theme::MUTED));
+                    ui.label(egui::RichText::new(Text::NoOpen.in_lang(lang)).strong().color(theme::text()));
+                    ui.label(egui::RichText::new(Text::AddOrOpen.in_lang(lang)).color(theme::muted()));
                 });
             });
             return;
@@ -478,15 +493,15 @@ impl App {
                 BookmarkRequest::CopyTime => self.copy_timestamp(ctx),
             }
             if job.bookmarks.is_empty() {
-                ui.label(egui::RichText::new(Text::NoBookmarks.in_lang(lang)).size(12.5).color(theme::MUTED));
+                ui.label(egui::RichText::new(Text::NoBookmarks.in_lang(lang)).size(12.5).color(theme::muted()));
             }
             for b in &job.bookmarks {
                 ui.horizontal(|ui| {
-                    let link = ui.add(egui::Link::new(egui::RichText::new(format_timestamp(b.ms, true)).monospace().color(theme::AMBER)));
+                    let link = ui.add(egui::Link::new(egui::RichText::new(format_timestamp(b.ms, true)).monospace().color(theme::amber())));
                     if link.on_hover_text(Text::JumpHere.in_lang(lang)).clicked() {
                         jump = Some(b.ms);
                     }
-                    ui.label(egui::RichText::new(&b.label).size(12.5).color(theme::MUTED));
+                    ui.label(egui::RichText::new(&b.label).size(12.5).color(theme::muted()));
                 });
             }
         });
@@ -530,8 +545,8 @@ impl App {
         let Some(id) = self.session.open_id() else {
             theme::card_frame().show(ui, |ui| {
                 ui.set_min_width(ui.available_width());
-                ui.label(egui::RichText::new(Text::NoOpen.in_lang(lang)).strong().color(theme::TEXT));
-                ui.label(egui::RichText::new(Text::PickFromQueue.in_lang(lang)).color(theme::MUTED));
+                ui.label(egui::RichText::new(Text::NoOpen.in_lang(lang)).strong().color(theme::text()));
+                ui.label(egui::RichText::new(Text::PickFromQueue.in_lang(lang)).color(theme::muted()));
             });
             return;
         };
@@ -544,13 +559,13 @@ impl App {
             ui.horizontal(|ui| {
                 ui.label(theme::caption(Text::Recording.in_lang(lang)));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(egui::RichText::new(duration).monospace().color(theme::MUTED));
+                    ui.label(egui::RichText::new(duration).monospace().color(theme::muted()));
                 });
             });
             ui.add_space(6.0);
-            ui.label(egui::RichText::new(title).size(20.0).strong().color(theme::TEXT));
+            ui.label(egui::RichText::new(title).size(20.0).strong().color(theme::text()));
             ui.add_space(2.0);
-            ui.label(egui::RichText::new(file).size(12.5).color(theme::MUTED));
+            ui.label(egui::RichText::new(file).size(12.5).color(theme::muted()));
         });
     }
 }
@@ -618,8 +633,8 @@ fn load_settings(path: &Path) -> Option<Settings> {
 /// shape, no asset file to license.
 fn brand(ui: &mut egui::Ui) {
     let (rect, _) = ui.allocate_exact_size(egui::vec2(20.0, 20.0), egui::Sense::hover());
-    ui.painter().rect_filled(rect, 6.0, theme::ACCENT);
-    ui.painter().rect_filled(rect.shrink(5.5), 2.0, theme::ACCENT_INK);
+    ui.painter().rect_filled(rect, 6.0, theme::accent());
+    ui.painter().rect_filled(rect.shrink(5.5), 2.0, theme::accent_ink());
     ui.label(egui::RichText::new("ScribeCraft").size(15.0).strong());
 }
 
@@ -627,7 +642,7 @@ fn brand(ui: &mut egui::Ui) {
 fn field(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 4.0;
-        ui.label(egui::RichText::new(label).color(theme::MUTED));
+        ui.label(egui::RichText::new(label).color(theme::muted()));
         add(ui);
     });
 }
@@ -669,7 +684,7 @@ fn detail_row(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
         ui.allocate_ui_with_layout(egui::vec2(64.0, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
-            ui.label(egui::RichText::new(label).size(12.0).color(theme::MUTED));
+            ui.label(egui::RichText::new(label).size(12.0).color(theme::muted()));
         });
         add(ui);
     });
@@ -678,10 +693,10 @@ fn detail_row(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
 /// A pill naming the state of the open dictation, coloured so finished work reads at a glance.
 fn status_pill(ui: &mut egui::Ui, status: Status, lang: Lang) {
     let (fill, ink) = match status {
-        Status::New => (theme::CARD_HI, theme::TEXT),
-        Status::InProgress => (theme::ACCENT_DIM, theme::ACCENT_SOFT),
-        Status::Done => (theme::AMBER_DIM, theme::AMBER_SOFT),
-        Status::Dispatched => (theme::CARD_HI, theme::MUTED),
+        Status::New => (theme::card_hi(), theme::text()),
+        Status::InProgress => (theme::accent_dim(), theme::accent_soft()),
+        Status::Done => (theme::amber_dim(), theme::amber_soft()),
+        Status::Dispatched => (theme::card_hi(), theme::muted()),
     };
     theme::pill_frame(fill).show(ui, |ui| {
         ui.label(egui::RichText::new(job_list::status_name(status, lang)).size(11.5).color(ink));
@@ -738,7 +753,7 @@ mod tests {
     fn a_short_window_scrolls_the_pane_above_the_dock() {
         // The same panel order as `App::ui`: status, dock, then the central pane.
         let ctx = egui::Context::default();
-        theme::apply(&ctx);
+        theme::apply(&ctx, Theme::Dark);
         let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(900.0, 320.0));
         let draw = |events: Vec<egui::Event>| {
             let input = egui::RawInput { screen_rect: Some(screen), events, ..Default::default() };
@@ -792,7 +807,7 @@ mod tests {
     #[test]
     fn the_details_panel_scrolls_instead_of_cutting_off_the_bookmarks() {
         let ctx = egui::Context::default();
-        theme::apply(&ctx);
+        theme::apply(&ctx, Theme::Dark);
         let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(900.0, 240.0));
         let draw = |events: Vec<egui::Event>| {
             let input = egui::RawInput { screen_rect: Some(screen), events, ..Default::default() };
@@ -842,7 +857,7 @@ mod tests {
     fn the_bookmark_controls_fit_the_details_panel_in_both_languages() {
         for lang in [Lang::English, Lang::Italiano] {
             let ctx = egui::Context::default();
-            theme::apply(&ctx);
+            theme::apply(&ctx, Theme::Dark);
             let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(900.0, 700.0));
             let draw = || {
                 let input = egui::RawInput { screen_rect: Some(screen), ..Default::default() };

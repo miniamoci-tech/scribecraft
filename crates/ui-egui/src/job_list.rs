@@ -2,7 +2,7 @@
 //!
 //! Rows are painted rather than built from widgets so that the priority stripe, the truncated
 //! title, the meta line and the duration keep their places at any width. Metadata is drawn in
-//! [`theme::MUTED`] (or [`theme::ACCENT_SOFT`] on the open row), never in the quietest colour:
+//! [`theme::muted()`] (or [`theme::accent_soft()`] on the open row), never in the quietest colour:
 //! small text on a hovered or selected row still has to reach WCAG AA.
 
 use eframe::egui::{self, Color32, FontFamily, FontId, Stroke};
@@ -82,8 +82,8 @@ impl Row {
     /// The stripe on the left: urgent work in red, high priority in amber, the rest quiet.
     fn stripe(&self) -> Option<Color32> {
         match self.priority {
-            Priority::Urgent => Some(theme::RED),
-            Priority::High => Some(theme::AMBER),
+            Priority::Urgent => Some(theme::red()),
+            Priority::High => Some(theme::amber()),
             Priority::Normal | Priority::Low => None,
         }
     }
@@ -127,18 +127,18 @@ pub(crate) fn count(rows: &[Row], filter: Filter) -> usize {
 
 /// One pill-shaped filter button.
 fn chip(ui: &mut egui::Ui, text: &str, selected: bool) -> egui::Response {
-    let galley = ui.painter().layout_no_wrap(text.to_owned(), small_font(), theme::TEXT);
+    let galley = ui.painter().layout_no_wrap(text.to_owned(), small_font(), theme::text());
     let padding = egui::vec2(10.0, 4.0);
     let (rect, response) = ui.allocate_exact_size(galley.size() + 2.0 * padding, egui::Sense::click());
     if !ui.is_rect_visible(rect) {
         return response;
     }
     let (fill, stroke, colour) = if selected {
-        (theme::ACCENT_DIM, theme::ACCENT_DIM, theme::ACCENT_SOFT)
+        (theme::accent_dim(), theme::accent_dim(), theme::accent_soft())
     } else if response.hovered() {
-        (theme::CARD_HI, theme::LINE, theme::TEXT)
+        (theme::card_hi(), theme::line(), theme::text())
     } else {
-        (Color32::TRANSPARENT, theme::LINE, theme::MUTED)
+        (Color32::TRANSPARENT, theme::line(), theme::muted())
     };
     let painter = ui.painter();
     if fill != Color32::TRANSPARENT {
@@ -157,18 +157,18 @@ pub(crate) fn row(ui: &mut egui::Ui, row: &Row, open: bool, lang: Lang) -> egui:
         return response;
     }
     let (fill, title_colour, meta_colour) = if open {
-        (theme::ACCENT_DIM, theme::TEXT, theme::ACCENT_SOFT)
+        (theme::accent_dim(), theme::text(), theme::accent_soft())
     } else if response.hovered() {
-        (theme::CARD_HI, theme::TEXT, theme::MUTED)
+        (theme::card_hi(), theme::text(), theme::muted())
     } else {
-        (Color32::TRANSPARENT, theme::TEXT, theme::MUTED)
+        (Color32::TRANSPARENT, theme::text(), theme::muted())
     };
     let painter = ui.painter();
     if fill != Color32::TRANSPARENT {
         painter.rect_filled(rect, ROW_RADIUS, fill);
     }
     if open {
-        painter.rect_stroke(rect, ROW_RADIUS, Stroke::new(1.0, theme::ACCENT), egui::StrokeKind::Inside);
+        painter.rect_stroke(rect, ROW_RADIUS, Stroke::new(1.0, theme::accent()), egui::StrokeKind::Inside);
     }
     if let Some(colour) = row.stripe() {
         let stripe = egui::Rect::from_min_size(egui::pos2(rect.left() + 4.0, rect.top() + 9.0), egui::vec2(3.0, rect.height() - 18.0));
@@ -213,7 +213,7 @@ mod tests {
     /// Draws one row at a known screen size and returns the shapes it painted.
     fn draw(job: &Row, open: bool) -> Vec<egui::Shape> {
         let ctx = egui::Context::default();
-        theme::apply(&ctx);
+        theme::apply(&ctx, theme::Theme::Dark);
         let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(320.0, 200.0));
         let input = egui::RawInput { screen_rect: Some(screen), ..Default::default() };
         let mut output = ctx.run_ui(input, |ui| {
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn clicking_a_chip_shows_only_that_status() {
         let ctx = egui::Context::default();
-        theme::apply(&ctx);
+        theme::apply(&ctx, theme::Theme::Dark);
         let rows = [sample(Status::New, Priority::Normal), sample(Status::Done, Priority::Low)];
         let mut filter = Filter::All;
         pass(&ctx, Vec::new(), &mut filter, &rows);
@@ -314,19 +314,19 @@ mod tests {
     #[test]
     fn an_urgent_row_paints_a_red_stripe() {
         let shapes = draw(&sample(Status::New, Priority::Urgent), false);
-        assert!(rects(&shapes).iter().any(|r| r.fill == theme::RED), "an urgent dictation must be marked in red");
+        assert!(rects(&shapes).iter().any(|r| r.fill == theme::red()), "an urgent dictation must be marked in red");
     }
 
     #[test]
     fn a_high_priority_row_paints_an_amber_stripe() {
         let shapes = draw(&sample(Status::New, Priority::High), false);
-        assert!(rects(&shapes).iter().any(|r| r.fill == theme::AMBER), "a high-priority dictation must be marked in amber");
+        assert!(rects(&shapes).iter().any(|r| r.fill == theme::amber()), "a high-priority dictation must be marked in amber");
     }
 
     #[test]
     fn a_normal_row_has_no_stripe() {
         let shapes = draw(&sample(Status::New, Priority::Normal), false);
-        let stripes = rects(&shapes).iter().filter(|r| r.fill == theme::AMBER || r.fill == theme::RED).count();
+        let stripes = rects(&shapes).iter().filter(|r| r.fill == theme::amber() || r.fill == theme::red()).count();
         assert_eq!(stripes, 0, "ordinary work must stay quiet");
     }
 
@@ -334,20 +334,20 @@ mod tests {
     fn the_open_row_is_highlighted() {
         let shapes = draw(&sample(Status::InProgress, Priority::Normal), true);
         let rects = rects(&shapes);
-        assert!(rects.iter().any(|r| r.fill == theme::ACCENT_DIM), "the open dictation must stand out");
-        assert!(rects.iter().any(|r| r.stroke.color == theme::ACCENT), "the open dictation gets an accent outline");
+        assert!(rects.iter().any(|r| r.fill == theme::accent_dim()), "the open dictation must stand out");
+        assert!(rects.iter().any(|r| r.stroke.color == theme::accent()), "the open dictation gets an accent outline");
     }
 
     #[test]
     fn a_long_title_is_elided_instead_of_pushing_the_duration_out() {
         let ctx = egui::Context::default();
-        theme::apply(&ctx);
+        theme::apply(&ctx, theme::Theme::Dark);
         let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(320.0, 200.0));
         let input = egui::RawInput { screen_rect: Some(screen), ..Default::default() };
         let mut measured = None;
         let mut output = ctx.run_ui(input, |ui| {
             let long = "a".repeat(400);
-            let galley = one_line(ui.painter(), &long, title_font(), theme::TEXT, 120.0);
+            let galley = one_line(ui.painter(), &long, title_font(), theme::text(), 120.0);
             measured = Some((galley.size().x, galley.elided));
         });
         output.textures_delta.clear();

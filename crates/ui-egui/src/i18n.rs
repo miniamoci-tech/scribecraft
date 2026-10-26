@@ -53,32 +53,40 @@ impl Lang {
     }
 }
 
-/// The language choice as stored in `ui.json`. Only the language: no personal data.
+/// The choices stored in `ui.json`: the language and the theme. Nothing else, so the file
+/// holds no personal data.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct Preferences {
     pub(crate) lang: Lang,
+    pub(crate) theme: crate::theme::Theme,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Stored {
     #[serde(default)]
     language: String,
+    #[serde(default)]
+    theme: String,
 }
 
 impl Preferences {
-    /// Reads a preferences file. A missing or damaged file means English, never an error:
-    /// a language choice must not keep the app from starting.
+    /// Reads a preferences file. A missing or damaged file means English in the dark theme,
+    /// never an error: a preference must not keep the app from starting.
     pub(crate) fn load(path: &Path) -> Self {
         let Ok(bytes) = std::fs::read(path) else { return Self::default() };
         Self::from_json(&bytes)
     }
 
+    /// Each field falls back on its own, so a file with an unknown theme still keeps the
+    /// chosen language (and the other way round).
     pub(crate) fn from_json(bytes: &[u8]) -> Self {
-        serde_json::from_slice::<Stored>(bytes).ok().and_then(|s| Lang::from_code(&s.language)).map_or(Self::default(), |lang| Self { lang })
+        let Ok(stored) = serde_json::from_slice::<Stored>(bytes) else { return Self::default() };
+        Self { lang: Lang::from_code(&stored.language).unwrap_or_default(), theme: crate::theme::Theme::from_code(&stored.theme).unwrap_or_default() }
     }
 
     pub(crate) fn to_json(self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec_pretty(&Stored { language: self.lang.code().to_owned() }).map_err(|e| e.to_string())
+        let stored = Stored { language: self.lang.code().to_owned(), theme: self.theme.code().to_owned() };
+        serde_json::to_vec_pretty(&stored).map_err(|e| e.to_string())
     }
 
     /// Writes the choice atomically, so a crash never leaves half a file behind.
@@ -207,6 +215,9 @@ texts! {
     Everywhere => "everywhere" | "ovunque",
     InThisWindow => "in this window" | "in questa finestra",
     LanguageHint => "Interface language" | "Lingua dell'interfaccia",
+    ThemeHint => "Theme (dark or light)" | "Tema (scuro o chiaro)",
+    ThemeDark => "Dark" | "Scuro",
+    ThemeLight => "Light" | "Chiaro",
 
     // Queue headings and empty states.
     Dictations => "Dictations" | "Dettature",
@@ -476,12 +487,28 @@ mod tests {
         assert_eq!(Preferences::load(&temp_path("never-written")).lang, Lang::English);
     }
 
+    /// A file written by another version may hold a theme we do not know, or no theme at
+    /// all: the language must still be honoured, and the theme falls back to dark alone.
+    #[test]
+    fn each_choice_falls_back_on_its_own() {
+        use crate::theme::Theme;
+        let p = Preferences::from_json(br#"{"language":"it","theme":"sepia"}"#);
+        assert_eq!((p.lang, p.theme), (Lang::Italiano, Theme::Dark));
+        let p = Preferences::from_json(br#"{"language":"fr","theme":"light"}"#);
+        assert_eq!((p.lang, p.theme), (Lang::English, Theme::Light));
+        let p = Preferences::from_json(br#"{"theme":"light"}"#);
+        assert_eq!((p.lang, p.theme), (Lang::English, Theme::Light));
+        let p = Preferences::from_json(br#"{"language":"it"}"#);
+        assert_eq!((p.lang, p.theme), (Lang::Italiano, Theme::Dark));
+    }
+
     #[test]
     fn a_language_choice_is_written_and_read_back() {
         let path = temp_path("language");
         let _ = std::fs::remove_file(&path);
-        Preferences { lang: Lang::Italiano }.save(&path).unwrap();
-        assert_eq!(Preferences::load(&path).lang, Lang::Italiano, "the chosen language must survive a restart");
+        let saved = Preferences { lang: Lang::Italiano, theme: crate::theme::Theme::Light };
+        saved.save(&path).unwrap();
+        assert_eq!(Preferences::load(&path), saved, "both choices must survive a restart");
         let _ = std::fs::remove_file(&path);
     }
 
