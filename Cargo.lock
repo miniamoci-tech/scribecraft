@@ -3069,6 +3069,7 @@ dependencies = [
  "rfd",
  "scribecraft-engine",
  "scribecraft-platform",
+ "serde",
  "serde_json",
 ]
 

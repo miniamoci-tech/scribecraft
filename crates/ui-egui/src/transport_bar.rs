@@ -13,6 +13,7 @@ use eframe::egui;
 use scribecraft_engine::transport::{MAX_SPEED, MIN_SPEED, SpeedPreset, format_timestamp};
 use scribecraft_engine::{State, Transport, lock_transport};
 
+use crate::i18n::{self, Lang, Text};
 use crate::theme;
 
 /// A press shorter than this on a scan button is a skip; a longer press scans while held.
@@ -168,7 +169,7 @@ impl TransportBar {
 
     /// Draws the dock. `bookmarks` are the open dictation's bookmark times, marked on the
     /// seek bar so they can be seen without opening the list.
-    pub(crate) fn show(&mut self, ui: &mut egui::Ui, transport: &Arc<Mutex<Transport>>, skip_ms: u64, bookmarks: &[u64]) {
+    pub(crate) fn show(&mut self, ui: &mut egui::Ui, transport: &Arc<Mutex<Transport>>, skip_ms: u64, bookmarks: &[u64], lang: Lang) {
         let now = {
             let t = lock_transport(transport);
             Snapshot {
@@ -185,22 +186,22 @@ impl TransportBar {
         let wide = ui.available_width() >= 780.0;
         theme::card_frame().show(ui, |ui| {
             ui.set_min_width(ui.available_width());
-            header(ui, &now);
+            header(ui, &now, lang);
             ui.add_space(4.0);
             self.seek_bar(ui, transport, now.pos, now.dur, bookmarks);
             ui.add_space(2.0);
             ui.horizontal(|ui| {
-                self.buttons(ui, transport, skip_ms, &now);
+                self.buttons(ui, transport, skip_ms, &now, lang);
                 if wide {
                     ui.separator();
-                    speed_controls(ui, transport, &now);
+                    speed_controls(ui, transport, &now, lang);
                 }
             });
             if !wide {
-                ui.horizontal(|ui| speed_controls(ui, transport, &now));
+                ui.horizontal(|ui| speed_controls(ui, transport, &now, lang));
             }
             ui.add_space(2.0);
-            ui.add(egui::Label::new(egui::RichText::new("Hold a scan button to scan; tap it to skip.").size(11.0).color(theme::FAINT)).wrap());
+            ui.add(egui::Label::new(egui::RichText::new(Text::ScanHint.in_lang(lang)).size(11.0).color(theme::FAINT)).wrap());
         });
     }
 
@@ -241,43 +242,48 @@ impl TransportBar {
     }
 
     /// Start, skip back, rewind, play/stop, fast-forward and skip forward.
-    fn buttons(&mut self, ui: &mut egui::Ui, transport: &Arc<Mutex<Transport>>, skip_ms: u64, now: &Snapshot) {
+    fn buttons(&mut self, ui: &mut egui::Ui, transport: &Arc<Mutex<Transport>>, skip_ms: u64, now: &Snapshot, lang: Lang) {
         let time = ui.input(|i| i.time);
         let skip = i64::try_from(skip_ms).unwrap_or(i64::MAX);
 
-        if icon_button(ui, "⏮", "Go to the start").clicked() {
+        if icon_button(ui, "⏮", Text::GoToStart.in_lang(lang)).clicked() {
             lock_transport(transport).seek_ms(0);
         }
-        if skip_button(ui, format!("« {}", skip_label(skip_ms)), "Skip back").clicked() {
+        if skip_button(ui, format!("« {}", skip_label(skip_ms)), Text::SkipBack.in_lang(lang)).clicked() {
             lock_transport(transport).skip_ms(-skip);
         }
 
-        let rew = icon_button(ui, "⏪", &format!("Rewind at {:.0}× — hold to scan, tap to skip back (F7)", now.rewind_rate));
+        let rew = icon_button(ui, "⏪", &i18n::rewind_hint(now.rewind_rate, lang));
         let action = self.rewind.update(rew.is_pointer_button_down_on(), rew.clicked(), time, now.state, now.pos);
         self.rewind.apply(action, transport, skip);
 
-        let (text, hint) = if now.state == State::Playing { ("⏸  Stop", "Stop (F9)") } else { ("▶  Play", "Play (F9)") };
-        let play = egui::Button::new(egui::RichText::new(text).size(15.0).strong().color(theme::ACCENT_INK))
-            .fill(theme::ACCENT)
-            .stroke(egui::Stroke::new(1.0, theme::ACCENT))
-            .corner_radius(9)
-            .min_size(egui::vec2(112.0, 38.0));
-        if ui.add(play).on_hover_text(hint).clicked() {
+        let (text, hint) = if now.state == State::Playing { (Text::Stop, Text::StopHint) } else { (Text::Play, Text::PlayHint) };
+        let play = egui::Button::new(
+            egui::RichText::new(format!("{}  {}", if now.state == State::Playing { "⏸" } else { "▶" }, text.in_lang(lang)))
+                .size(15.0)
+                .strong()
+                .color(theme::ACCENT_INK),
+        )
+        .fill(theme::ACCENT)
+        .stroke(egui::Stroke::new(1.0, theme::ACCENT))
+        .corner_radius(9)
+        .min_size(egui::vec2(112.0, 38.0));
+        if ui.add(play).on_hover_text(hint.in_lang(lang)).clicked() {
             lock_transport(transport).toggle_play();
         }
 
-        let ff = icon_button(ui, "⏩", &format!("Fast-forward at {:.0}× — hold to scan, tap to skip forward (F8)", now.fast_rate));
+        let ff = icon_button(ui, "⏩", &i18n::forward_hint(now.fast_rate, lang));
         let action = self.forward.update(ff.is_pointer_button_down_on(), ff.clicked(), time, now.state, now.pos);
         self.forward.apply(action, transport, skip);
 
-        if skip_button(ui, format!("{} »", skip_label(skip_ms)), "Skip forward").clicked() {
+        if skip_button(ui, format!("{} »", skip_label(skip_ms)), Text::SkipForward.in_lang(lang)).clicked() {
             lock_transport(transport).skip_ms(skip);
         }
     }
 }
 
 /// The clock, the state pill and the time remaining.
-fn header(ui: &mut egui::Ui, now: &Snapshot) {
+fn header(ui: &mut egui::Ui, now: &Snapshot, lang: Lang) {
     // Below this width the percentage would push the remaining time off the row; the speed
     // row still shows it.
     let compact = ui.available_width() < 620.0;
@@ -285,13 +291,13 @@ fn header(ui: &mut egui::Ui, now: &Snapshot) {
         let clock = egui::RichText::new(format_timestamp(now.pos, true)).font(egui::FontId::monospace(30.0)).strong().color(theme::TEXT);
         ui.label(clock);
         let total = egui::RichText::new(format!("/ {}", format_timestamp(now.dur, true))).font(egui::FontId::monospace(15.0)).color(theme::FAINT);
-        ui.label(total).on_hover_text("Length of the dictation");
+        ui.label(total).on_hover_text(Text::Length.in_lang(lang));
         ui.add_space(4.0);
-        state_pill(ui, now.state, now.rewind_rate, now.fast_rate);
+        state_pill(ui, now.state, now.rewind_rate, now.fast_rate, lang);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let remaining = now.dur.saturating_sub(now.pos);
             ui.label(egui::RichText::new(format!("−{}", format_timestamp(remaining, true))).font(egui::FontId::monospace(13.0)).color(theme::MUTED))
-                .on_hover_text("Time remaining");
+                .on_hover_text(Text::TimeRemaining.in_lang(lang));
             if !compact {
                 ui.label(egui::RichText::new(format!("{:.0} %", now.speed * 100.0)).size(12.0).color(theme::FAINT));
             }
@@ -299,14 +305,24 @@ fn header(ui: &mut egui::Ui, now: &Snapshot) {
     });
 }
 
+/// What the state pill says, including the rate of a scan.
+fn state_text(state: State, rewind_rate: f64, fast_rate: f64, lang: Lang) -> String {
+    match state {
+        State::Stopped => Text::Stopped.in_lang(lang).to_owned(),
+        State::Playing => Text::Playing.in_lang(lang).to_owned(),
+        State::Rewinding => i18n::fill(Text::Rewinding.in_lang(lang), &[("{rate}", &format!("{rewind_rate:.0}"))]),
+        State::FastForwarding => i18n::fill(Text::FastForwarding.in_lang(lang), &[("{rate}", &format!("{fast_rate:.0}"))]),
+    }
+}
+
 /// A pill that says what the transport is doing, with a lamp and the scan rate.
-fn state_pill(ui: &mut egui::Ui, state: State, rewind_rate: f64, fast_rate: f64) {
-    let (fill, ink, lamp, text) = match state {
-        State::Stopped => (theme::CARD_HI, theme::MUTED, theme::FAINT, "stopped".to_owned()),
-        State::Playing => (theme::ACCENT_DIM, theme::ACCENT_SOFT, theme::ACCENT, "playing".to_owned()),
-        State::Rewinding => (theme::AMBER_DIM, theme::AMBER_SOFT, theme::AMBER, format!("rewinding {rewind_rate:.0}×")),
-        State::FastForwarding => (theme::AMBER_DIM, theme::AMBER_SOFT, theme::AMBER, format!("fast-forwarding {fast_rate:.0}×")),
+fn state_pill(ui: &mut egui::Ui, state: State, rewind_rate: f64, fast_rate: f64, lang: Lang) {
+    let (fill, ink, lamp) = match state {
+        State::Stopped => (theme::CARD_HI, theme::MUTED, theme::FAINT),
+        State::Playing => (theme::ACCENT_DIM, theme::ACCENT_SOFT, theme::ACCENT),
+        State::Rewinding | State::FastForwarding => (theme::AMBER_DIM, theme::AMBER_SOFT, theme::AMBER),
     };
+    let text = state_text(state, rewind_rate, fast_rate, lang);
     theme::pill_frame(fill).show(ui, |ui| {
         ui.set_min_width(104.0);
         ui.horizontal(|ui| {
@@ -319,12 +335,20 @@ fn state_pill(ui: &mut egui::Ui, state: State, rewind_rate: f64, fast_rate: f64)
 }
 
 /// Slow / fast presets, the speed slider and the reset.
-fn speed_controls(ui: &mut egui::Ui, transport: &Arc<Mutex<Transport>>, now: &Snapshot) {
+fn speed_controls(ui: &mut egui::Ui, transport: &Arc<Mutex<Transport>>, now: &Snapshot, lang: Lang) {
     ui.spacing_mut().item_spacing.x = 6.0;
-    if ui.selectable_label(now.preset == SpeedPreset::Slow, "Slow").on_hover_text("Slow preset (F5)").clicked() {
+    if ui
+        .selectable_label(now.preset == SpeedPreset::Slow, Text::SlowPreset.in_lang(lang))
+        .on_hover_text(Text::SlowPresetHint.in_lang(lang))
+        .clicked()
+    {
         lock_transport(transport).toggle_slow();
     }
-    if ui.selectable_label(now.preset == SpeedPreset::Fast, "Fast").on_hover_text("Fast preset (F6)").clicked() {
+    if ui
+        .selectable_label(now.preset == SpeedPreset::Fast, Text::FastPreset.in_lang(lang))
+        .on_hover_text(Text::FastPresetHint.in_lang(lang))
+        .clicked()
+    {
         lock_transport(transport).toggle_fast();
     }
     let mut pct = now.speed * 100.0;
@@ -333,7 +357,7 @@ fn speed_controls(ui: &mut egui::Ui, transport: &Arc<Mutex<Transport>>, now: &Sn
     if slider.changed() {
         let _ = lock_transport(transport).set_speed((pct / 100.0).clamp(MIN_SPEED, MAX_SPEED));
     }
-    if ui.button("100 %").on_hover_text("Reset to normal speed").clicked() {
+    if ui.button("100 %").on_hover_text(Text::ResetSpeed.in_lang(lang)).clicked() {
         let _ = lock_transport(transport).set_speed(1.0);
     }
 }
@@ -393,7 +417,7 @@ mod tests {
     fn draw(bar: &mut TransportBar, t: &Arc<Mutex<Transport>>, bookmarks: &[u64]) -> Vec<egui::Shape> {
         let ctx = egui::Context::default();
         theme::apply(&ctx);
-        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| bar.show(ui, t, 5_000, bookmarks));
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| bar.show(ui, t, 5_000, bookmarks, Lang::English));
         // No renderer here; drop the font-atlas deltas as a renderer would consume them.
         let shapes = output.shapes.iter().map(|s| s.shape.clone()).collect();
         output.textures_delta.clear();
@@ -534,5 +558,14 @@ mod tests {
         assert_eq!(skip_label(5_000), "5 s");
         assert_eq!(skip_label(750), "750 ms");
         assert_eq!(skip_label(0), "0 s");
+    }
+
+    /// The state pill follows the chosen language, and a scan still names its rate.
+    #[test]
+    fn the_transport_state_is_said_in_the_chosen_language() {
+        assert_eq!(state_text(State::Playing, 8.0, 8.0, Lang::English), "playing");
+        assert_eq!(state_text(State::Playing, 8.0, 8.0, Lang::Italiano), "in riproduzione");
+        assert_eq!(state_text(State::Rewinding, 8.0, 8.0, Lang::Italiano), "riavvolgimento 8×");
+        assert_eq!(state_text(State::FastForwarding, 8.0, 12.0, Lang::English), "fast-forwarding 12×");
     }
 }
