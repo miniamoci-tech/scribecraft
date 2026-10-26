@@ -19,6 +19,7 @@ Engineering debts: linear output resampler; WSOLA graininess below 40 %; depende
 (cpal 0.18, Symphonia 0.6).
 
 ## Revision history
+- 2026-10-25 — restyle phase 1: one dark palette in `theme.rs` (WCAG-AA contrast checked by tests), a transport dock at the bottom with clock, state pill, remaining time and bookmark marks on the seek bar, and a scrolling pane for the open dictation on short windows.
 - 2026-10-25 — the transport bar no longer ends a scan it did not start (pedal and system-wide fast-forward survived one frame); a scan button now scans while held and skips on a tap; pedal learning waits until every pedal is up and ignores a bit another pedal uses. First UI tests (transport bar, headless egui).
 - 2026-10-20 — foot pedals (USB HID, serial) and system-wide hotkeys implemented; DSS moves to rank 1.
 - 2026-10-19 — first ranking after M0.
