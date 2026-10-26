@@ -15,4 +15,5 @@
 
 ## Revision history
 - 2026-10-25 — M2: the interface speaks English and Italian; the language is chosen in the toolbar and saved in `ui.json`.
+- 2026-10-25 — M2: a guided pedal setup in the Pedal tab: three steps (device, learn, functions) over the same `pedal.json` as the advanced tab, with a step counter, a guarded Next and scrolling lists, in both languages.
 - 2026-10-19 — created.

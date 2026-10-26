@@ -292,9 +292,9 @@ area = "C"
 tier = "P2"
 milestone = "M3"
 status = "partial"
-tools = ["pedal_learn"]
-evidence = ["crates/engine/src/pedal.rs::learning_finds_the_pressed_bit_including_active_low_pedals"]
-notes = "The Pedal and keys window lists devices, shows each pedal live, learns a pedal by pressing it and sets its function; scribecraft-cli pedal list / pedal monitor for diagnosis. Not a step-by-step wizard yet."
+tools = ["pedal_config_get", "pedal_config_set", "pedal_learn", "pedal_report"]
+evidence = ["crates/ui-egui/src/controls.rs::the_pedal_wizard_walks_its_steps_in_order", "crates/ui-egui/src/controls.rs::reopening_the_wizard_returns_to_the_first_step", "crates/ui-egui/src/controls.rs::choosing_a_device_sets_the_pedals_it_starts_from", "crates/automation/tests/automation.rs::serial_foot_pedal_drives_playback_end_to_end"]
+notes = "The Pedal tab opens a guided setup in three steps: choose the device, press each pedal once, choose what it does. The step counter, Back and a Next button that waits for a device and at least one learned pedal; steps cannot be skipped ahead, so a function is never assigned to a pedal that was not learned. It writes the same pedal.json as the advanced tab, which shares the device list, the play-mode choice and the pedal table, and the lists scroll. The advanced tab stays for diagnosis (live state, last report, learning one pedal again), with scribecraft-cli pedal list / pedal monitor. Not yet: checked with a physical pedal; the tests drive the step order and the configuration each choice produces, not a real window click."
 
 [[feature]]
 id = "ctl.speechmike"
