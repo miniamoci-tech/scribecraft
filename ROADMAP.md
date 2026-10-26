@@ -2,11 +2,12 @@
 
 **Stage: pre-alpha** · next: alpha (global hotkeys + pedals) · parity 17/45 (weighted ≈ 46 %, ready for real work ≈ 25 %)
 
-> **Last reviewed:** 2026-10-25 · **Last updated:** 2026-10-25 · **Change:** fixed pedal / hotkey fast-forward; restyle phase 2 (job-list filters and rows) · **Target:** Express Scribe Pro (public feature description)
+> **Last reviewed:** 2026-10-25 · **Last updated:** 2026-10-25 · **Change:** fixed pedal / hotkey fast-forward; restyle phase 3 (details panel) · **Target:** Express Scribe Pro (public feature description)
 
 - Milestones: [`docs/roadmap.md`](docs/roadmap.md) · Gaps: [`docs/gaps.md`](docs/gaps.md) · Measurement: [`docs/target-app-parity.md`](docs/target-app-parity.md)
 
 ## Progress log
+- 2026-10-25 — Restyle phase 3: the dictation's fields moved out of the scrolling centre into a resizable details panel on the right, with a status pill in its header, labelled fields that line up, and the bookmark list with jump links, an add field and a copy-time action. The centre now holds the recording card and a large notes editor, where the words are actually written. The panel scrolls on its own. `apply_edits` was extracted and tested: a field edit or a paste leaves bookmarks, the path and the saved position alone. Phase 4 (pedal learning wizard) next.
 - 2026-10-25 — Restyle phase 2: the queue has filter chips (All / To do / In progress / Done / Sent) with live counts that keep only the matching jobs, and hand-painted rows with a red or amber priority stripe, an elided title, status · author and a right-aligned duration. Metadata stays on WCAG-AA colours on hover and on the open row. A headless test clicks the Done chip and checks the queue narrows to finished work. Phase 3 (details panel) next.
 - 2026-10-25 — Restyle phase 1: one dark palette and widget style in `theme.rs`, contrast-checked by tests; the transport moved into a card dock at the bottom with a large monospaced clock, a state pill that names the scan rate, time remaining, bookmark marks on the seek bar and an accent playhead. The open dictation's pane scrolls on short windows. Phase 2 (job-list filters and chips) next.
 - 2026-10-25 — Fix: the transport bar ended any scan not backed by its own button or F8, so a fast-forward started by a foot pedal or a system-wide key stopped after one frame (play was unaffected). The bar now ends only a scan it started; holding ⏪/⏩ scans and a tap skips by the configured amount. Pedal learning waits until every pedal is released and refuses a bit another pedal already uses, so releasing a pedal held while Learn was clicked no longer stores a duplicate. First headless UI tests (transport bar).

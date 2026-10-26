@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use eframe::egui;
 use scribecraft_engine::transport::{ChannelMode, format_timestamp};
-use scribecraft_engine::{Priority, Session, Settings, State, Status, Transport, lock_transport, media, scan_folder};
+use scribecraft_engine::{Dictation, Priority, Session, Settings, State, Status, Transport, lock_transport, media, scan_folder};
 use scribecraft_platform::AudioOutput;
 
 use controls::Controls;
@@ -369,77 +369,145 @@ impl App {
         }
     }
 
+    /// The right-hand card: what the open dictation is and what has to be done with it.
     fn details(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         let Some(id) = self.session.open_id() else { return };
         let Ok(job) = self.session.jobs().get(id) else { return };
         let mut job = job.clone();
         let before = job.clone();
-        ui.add_space(6.0);
-        theme::card_frame().show(ui, |ui| {
-            ui.set_min_width(ui.available_width());
-            ui.label(theme::caption("DICTATION"));
-            ui.add_space(2.0);
+        let mut jump = None;
+        egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = 3.0;
             ui.horizontal(|ui| {
-                ui.label("Title");
-                ui.text_edit_singleline(&mut job.title);
-                ui.label("Author");
-                ui.text_edit_singleline(&mut job.author);
+                ui.label(theme::caption("DICTATION"));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| status_pill(ui, job.status));
             });
-            ui.horizontal(|ui| {
-                egui::ComboBox::from_label("priority").selected_text(format!("{:?}", job.priority)).show_ui(ui, |ui| {
+            ui.add_space(4.0);
+            detail_row(ui, "Title", |ui| {
+                let width = ui.available_width();
+                ui.add(egui::TextEdit::singleline(&mut job.title).desired_width(width));
+            });
+            detail_row(ui, "Author", |ui| {
+                let width = ui.available_width();
+                ui.add(egui::TextEdit::singleline(&mut job.author).hint_text("who dictated it").desired_width(width));
+            });
+            detail_row(ui, "Priority", |ui| {
+                let width = ui.available_width();
+                egui::ComboBox::from_id_salt("details_priority").selected_text(priority_name(job.priority)).width(width).show_ui(ui, |ui| {
                     for p in [Priority::Low, Priority::Normal, Priority::High, Priority::Urgent] {
-                        ui.selectable_value(&mut job.priority, p, format!("{p:?}"));
+                        ui.selectable_value(&mut job.priority, p, priority_name(p));
                     }
                 });
-                egui::ComboBox::from_label("status").selected_text(job_list::status_name(job.status)).show_ui(ui, |ui| {
+            });
+            detail_row(ui, "Status", |ui| {
+                let width = ui.available_width();
+                egui::ComboBox::from_id_salt("details_status").selected_text(job_list::status_name(job.status)).width(width).show_ui(ui, |ui| {
                     for s in [Status::New, Status::InProgress, Status::Done, Status::Dispatched] {
                         ui.selectable_value(&mut job.status, s, job_list::status_name(s));
                     }
                 });
-                ui.label("Due");
-                ui.add(egui::TextEdit::singleline(&mut job.due).desired_width(110.0).hint_text("YYYY-MM-DD"));
+            });
+            detail_row(ui, "Due", |ui| {
+                let width = ui.available_width();
+                ui.add(egui::TextEdit::singleline(&mut job.due).hint_text("YYYY-MM-DD").desired_width(width));
+            });
+
+            ui.add_space(4.0);
+            ui.separator();
+            ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                ui.label(theme::caption("BOOKMARKS"));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.weak(job.bookmarks.len().to_string());
+                });
             });
             ui.horizontal(|ui| {
-                if ui.button("Copy time stamp").on_hover_text("F10").clicked() {
-                    self.copy_timestamp(ctx);
-                }
-                ui.add(egui::TextEdit::singleline(&mut self.bookmark_label).hint_text("bookmark label").desired_width(200.0));
-                if ui.button("Add bookmark").on_hover_text("Ctrl+B").clicked() {
+                let width = (ui.available_width() - 150.0).max(70.0);
+                ui.add(egui::TextEdit::singleline(&mut self.bookmark_label).hint_text("label").desired_width(width));
+                if ui.button("Add").on_hover_text("Ctrl+B").clicked() {
                     self.bookmark();
                 }
+                if ui.button("Copy time").on_hover_text("Copy the time stamp (F10)").clicked() {
+                    self.copy_timestamp(ctx);
+                }
             });
-            let mut jump = None;
-            if !job.bookmarks.is_empty() {
-                egui::CollapsingHeader::new(format!("Bookmarks ({})", job.bookmarks.len())).show(ui, |ui| {
-                    for b in &job.bookmarks {
-                        if ui.link(format!("{}  {}", format_timestamp(b.ms, true), b.label)).clicked() {
-                            jump = Some(b.ms);
-                        }
+            if job.bookmarks.is_empty() {
+                ui.label(egui::RichText::new("None yet. Ctrl+B marks the playhead.").size(12.5).color(theme::MUTED));
+            }
+            for b in &job.bookmarks {
+                ui.horizontal(|ui| {
+                    let link = ui.add(egui::Link::new(egui::RichText::new(format_timestamp(b.ms, true)).monospace().color(theme::AMBER)));
+                    if link.on_hover_text("Jump here").clicked() {
+                        jump = Some(b.ms);
                     }
+                    ui.label(egui::RichText::new(&b.label).size(12.5).color(theme::MUTED));
                 });
             }
-            ui.add_space(6.0);
+        });
+        if let Some(ms) = jump {
+            self.with_transport(|t| t.seek_ms(ms));
+        }
+        let edited = job.title != before.title
+            || job.author != before.author
+            || job.priority != before.priority
+            || job.status != before.status
+            || job.due != before.due;
+        // Field by field: a bookmark added above this frame must not be overwritten by the copy.
+        if edited && let Ok(d) = self.session.jobs_mut().get_mut(id) {
+            apply_edits(d, &job);
+        }
+    }
+
+    /// The notes: the transcriptionist's own words, in the room the window has to spare.
+    fn notes(&mut self, ui: &mut egui::Ui) {
+        let Some(id) = self.session.open_id() else { return };
+        let Ok(job) = self.session.jobs().get(id) else { return };
+        let mut notes = job.notes.clone();
+        let before = notes.clone();
+        theme::card_frame().show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
             ui.label(theme::caption("NOTES"));
-            ui.add(egui::TextEdit::multiline(&mut job.notes).desired_rows(6).desired_width(f32::INFINITY));
-            if let Some(ms) = jump {
-                self.with_transport(|t| t.seek_ms(ms));
-            }
-            let edited = job.title != before.title
-                || job.author != before.author
-                || job.priority != before.priority
-                || job.status != before.status
-                || job.due != before.due
-                || job.notes != before.notes;
-            // Field by field: a bookmark added above this frame must not be overwritten by the copy.
-            if edited && let Ok(d) = self.session.jobs_mut().get_mut(id) {
-                let limit = |s: String| s.chars().take(scribecraft_engine::MAX_TEXT_CHARS).collect::<String>();
-                d.title = limit(job.title);
-                d.author = limit(job.author);
-                d.priority = job.priority;
-                d.status = job.status;
-                d.due = limit(job.due);
-                d.notes = limit(job.notes);
-            }
+            ui.add_space(4.0);
+            ui.add(
+                egui::TextEdit::multiline(&mut notes)
+                    .desired_rows(10)
+                    .desired_width(f32::INFINITY)
+                    .hint_text("Anything to remember while transcribing"),
+            );
+        });
+        if notes != before
+            && let Ok(d) = self.session.jobs_mut().get_mut(id)
+        {
+            d.notes = limited(&notes);
+        }
+    }
+
+    /// The middle of the window: what is playing, big enough to read across the desk.
+    fn recording(&mut self, ui: &mut egui::Ui) {
+        let Some(id) = self.session.open_id() else {
+            theme::card_frame().show(ui, |ui| {
+                ui.set_min_width(ui.available_width());
+                ui.label(egui::RichText::new("No dictation open").strong().color(theme::TEXT));
+                ui.label(egui::RichText::new("Pick one from the queue, or add a recording to start.").color(theme::MUTED));
+            });
+            return;
+        };
+        let Ok(job) = self.session.jobs().get(id) else { return };
+        let file = job.path.file_name().map_or_else(|| job.path.display().to_string(), |n| n.to_string_lossy().into_owned());
+        let duration = job.duration_ms.map(|ms| format_timestamp(ms, false)).unwrap_or_else(|| "--:--:--".into());
+        let title = if job.title.trim().is_empty() { "Untitled recording" } else { job.title.as_str() };
+        theme::card_frame().show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
+            ui.horizontal(|ui| {
+                ui.label(theme::caption("RECORDING"));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(egui::RichText::new(duration).monospace().color(theme::MUTED));
+                });
+            });
+            ui.add_space(6.0);
+            ui.label(egui::RichText::new(title).size(20.0).strong().color(theme::TEXT));
+            ui.add_space(2.0);
+            ui.label(egui::RichText::new(file).size(12.5).color(theme::MUTED));
         });
     }
 }
@@ -464,11 +532,23 @@ impl eframe::App for App {
         egui::Panel::bottom("transport").frame(theme::dock_frame()).show(root, |ui| self.transport_dock(ui));
         self.controls.window(ctx);
         egui::Panel::left("jobs").frame(theme::side_frame()).resizable(true).default_size(300.0).show(root, |ui| self.job_list(ui));
+        if self.session.open_id().is_some() {
+            egui::Panel::right("details")
+                .frame(theme::side_frame())
+                .resizable(true)
+                .default_size(280.0)
+                .min_size(240.0)
+                .max_size(380.0)
+                .show(root, |ui| self.details(ui, ctx));
+        }
         egui::CentralPanel::default().frame(theme::central_frame()).show(root, |ui| {
             // The dock keeps its height at the bottom; a short window scrolls the rest.
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                self.recording(ui);
+                ui.add_space(10.0);
+                self.notes(ui);
+                ui.add_space(10.0);
                 self.settings_row(ui);
-                self.details(ui, ctx);
             });
         });
         // Keep the clock moving while sound plays.
@@ -507,6 +587,55 @@ fn field(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
         ui.label(egui::RichText::new(label).color(theme::MUTED));
         add(ui);
     });
+}
+
+/// One field in the details card: the label keeps a fixed column so the widgets line up.
+fn detail_row(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 8.0;
+        ui.allocate_ui_with_layout(egui::vec2(64.0, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+            ui.label(egui::RichText::new(label).size(12.0).color(theme::MUTED));
+        });
+        add(ui);
+    });
+}
+
+/// A pill naming the state of the open dictation, coloured so finished work reads at a glance.
+fn status_pill(ui: &mut egui::Ui, status: Status) {
+    let (fill, ink) = match status {
+        Status::New => (theme::CARD_HI, theme::TEXT),
+        Status::InProgress => (theme::ACCENT_DIM, theme::ACCENT_SOFT),
+        Status::Done => (theme::AMBER_DIM, theme::AMBER_SOFT),
+        Status::Dispatched => (theme::CARD_HI, theme::MUTED),
+    };
+    theme::pill_frame(fill).show(ui, |ui| {
+        ui.label(egui::RichText::new(job_list::status_name(status)).size(11.5).color(ink));
+    });
+}
+
+/// Copies the edited fields back, leaving bookmarks, the path and the saved position alone.
+/// Free text is capped so a paste cannot outgrow the job file.
+fn apply_edits(target: &mut Dictation, edited: &Dictation) {
+    target.title = limited(&edited.title);
+    target.author = limited(&edited.author);
+    target.priority = edited.priority;
+    target.status = edited.status;
+    target.due = limited(&edited.due);
+    target.notes = limited(&edited.notes);
+}
+
+/// A copy of free text that fits the job file; a paste must not outgrow it.
+fn limited(text: &str) -> String {
+    text.chars().take(scribecraft_engine::MAX_TEXT_CHARS).collect()
+}
+
+fn priority_name(p: Priority) -> &'static str {
+    match p {
+        Priority::Low => "low",
+        Priority::Normal => "normal",
+        Priority::High => "high",
+        Priority::Urgent => "urgent",
+    }
 }
 
 fn channel_name(m: ChannelMode) -> &'static str {
@@ -576,5 +705,76 @@ mod tests {
 
         assert!(scrolled_top < marker_top - 20.0, "the pane should scroll: {marker_top} -> {scrolled_top}");
         assert_eq!(clock_top, clock_after, "scrolling must not move the transport dock");
+    }
+
+    /// The details card is on the right and scrolls on its own. On a short window the fields
+    /// and the bookmark list would otherwise be cut off with no way to reach them.
+    #[test]
+    fn the_details_panel_scrolls_instead_of_cutting_off_the_bookmarks() {
+        let ctx = egui::Context::default();
+        theme::apply(&ctx);
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(900.0, 240.0));
+        let draw = |events: Vec<egui::Event>| {
+            let input = egui::RawInput { screen_rect: Some(screen), events, ..Default::default() };
+            let mut last = f32::NAN;
+            let mut output = ctx.run_ui(input, |ui| {
+                egui::Panel::right("details").frame(theme::side_frame()).default_size(280.0).show(ui, |ui| {
+                    egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                        for i in 0..30 {
+                            let rect = ui.label(format!("bookmark {i}")).rect;
+                            if i == 29 {
+                                last = rect.top();
+                            }
+                        }
+                    });
+                });
+            });
+            output.textures_delta.clear();
+            last
+        };
+        draw(Vec::new());
+        let first = draw(Vec::new());
+        assert!(first > screen.bottom(), "the list continues below the panel: {first}");
+
+        // egui applies a wheel event on the frames after it, so settle before measuring.
+        let pointer = egui::pos2(screen.right() - 120.0, 60.0);
+        draw(vec![egui::Event::PointerMoved(pointer)]);
+        draw(vec![
+            egui::Event::PointerMoved(pointer),
+            egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                delta: egui::vec2(0.0, -120.0),
+                phase: egui::TouchPhase::Move,
+                modifiers: egui::Modifiers::default(),
+            },
+        ]);
+        draw(Vec::new());
+        let scrolled = draw(Vec::new());
+        assert!(scrolled < first - 20.0, "the wheel must bring the rest into view: {first} -> {scrolled}");
+    }
+
+    /// A bookmark added while the frame is open is written straight into the job; the copy of
+    /// the edited fields must not bring the old list back, and a paste must not outgrow the file.
+    #[test]
+    fn applying_edits_leaves_bookmarks_and_the_saved_position_alone() {
+        let mut target = Dictation {
+            path: PathBuf::from("/tmp/dictation.wav"),
+            position_ms: 12_400,
+            bookmarks: vec![scribecraft_engine::Bookmark { ms: 5_000, label: "history".into() }],
+            ..Dictation::default()
+        };
+        let mut edited = target.clone();
+        edited.status = Status::Done;
+        edited.priority = Priority::Urgent;
+        edited.title = "t".repeat(scribecraft_engine::MAX_TEXT_CHARS + 30);
+        edited.notes = "n".repeat(scribecraft_engine::MAX_TEXT_CHARS + 30);
+        apply_edits(&mut target, &edited);
+        assert_eq!(target.status, Status::Done);
+        assert_eq!(target.priority, Priority::Urgent);
+        assert_eq!(target.title.chars().count(), scribecraft_engine::MAX_TEXT_CHARS);
+        assert_eq!(target.notes.chars().count(), scribecraft_engine::MAX_TEXT_CHARS);
+        assert_eq!(target.bookmarks, edited.bookmarks, "a bookmark added during the frame must survive the copy");
+        assert_eq!(target.position_ms, 12_400);
+        assert_eq!(target.path, edited.path);
     }
 }
