@@ -19,6 +19,7 @@ Engineering debts: linear output resampler; WSOLA graininess below 40 %; depende
 (cpal 0.18, Symphonia 0.6).
 
 ## Revision history
+- 2026-10-26 — selecting a queue row opens the job but no longer plays it, and the details panel can remove a job from the list after a confirmation; `Session::remove` closes an open transport first and keeps the recording file, which supersedes "queue rows start playback when picked" below.
 - 2026-10-26 — macOS: closing the window crashed (`-[_NSTouchBarFinderObservation invalidate]`, an uncaught AppKit exception) because eframe dropped the window under the running run loop; the close is now taken over and goes through `-[NSApplication terminate:]`, and `on_exit` still saves the job list. Rank 2 (pedal proof) is unaffected.
 - 2026-10-25 — the pedal setup is now a guided three-step wizard (device, learn, functions) sharing the advanced tab's configuration and pedal table; step order and its guards are tested, but it still needs a physical pedal (rank 2).
 - 2026-10-25 — the interface speaks English and Italian: one string table in `i18n.rs` (a missing translation does not compile), a toolbar selector, the choice saved atomically in `ui.json`, placeholders checked for both languages; engine and device messages stay as they come. The longer Italian labels showed the bookmark row overflowing the details panel and widening it frame after frame; the label field and the buttons are now on separate lines, with a headless regression test in both languages.

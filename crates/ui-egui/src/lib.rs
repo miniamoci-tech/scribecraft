@@ -53,6 +53,9 @@ struct App {
     bar: TransportBar,
     controls: Controls,
     filter: Filter,
+    /// The dictation whose removal is waiting for a confirmation, if any. Nothing is thrown
+    /// away on a single click, and removing does not touch the recording file.
+    confirm_remove: Option<u64>,
 }
 
 impl App {
@@ -97,6 +100,7 @@ impl App {
             bar: TransportBar::default(),
             controls,
             filter: Filter::default(),
+            confirm_remove: None,
         };
         let mut last = None;
         for f in files {
@@ -146,6 +150,7 @@ impl App {
         self.transport = None;
         self.bar.reset();
         self.controls.set_transport(None);
+        self.confirm_remove = None;
         match self.session.open(id) {
             Ok(t) => {
                 match AudioOutput::open(t.clone()) {
@@ -160,10 +165,71 @@ impl App {
         }
     }
 
-    /// Opens a dictation and starts it: picking a job in the queue means listening to it.
-    fn open_and_play(&mut self, id: u64) {
-        self.open(id);
-        let _ = self.with_transport(|t| t.play());
+    /// Removes a dictation from the list, after the confirmation. The open transport is stopped
+    /// and let go before the job disappears, and the recording file on disk is never touched.
+    fn remove_dictation(&mut self, id: u64) {
+        if self.session.open_id() == Some(id) {
+            self.output = None;
+            self.transport = None;
+            self.bar.reset();
+            self.controls.set_transport(None);
+        }
+        self.confirm_remove = None;
+        match self.session.remove(id) {
+            Ok(job) => {
+                self.report(Ok(i18n::removed(&job_title(&job, self.lang), self.lang)));
+                self.save();
+            }
+            Err(e) => self.report(Err(e.to_string())),
+        }
+    }
+
+    /// Carries out a choice from a queue row's right-click menu. Removing only asks here; the
+    /// question is answered in the details panel (open job) or the confirmation window.
+    fn row_action(&mut self, id: u64, action: job_list::RowAction) {
+        let lang = self.lang;
+        match action.status() {
+            Some(status) => {
+                let title = match self.session.jobs_mut().get_mut(id) {
+                    Ok(d) => {
+                        d.status = status;
+                        job_title(d, lang)
+                    }
+                    Err(e) => return self.report(Err(e.to_string())),
+                };
+                self.report(Ok(i18n::marked(&title, status == Status::Done, lang)));
+                self.save();
+            }
+            None => self.confirm_remove = Some(id),
+        }
+    }
+
+    /// The confirmation window for removing a dictation that is not the open one (the open
+    /// one asks inside its details panel). Escape or a click outside cancels.
+    fn remove_window(&mut self, ctx: &egui::Context) {
+        let Some(id) = self.confirm_remove else { return };
+        if self.session.open_id() == Some(id) {
+            return;
+        }
+        let lang = self.lang;
+        let Ok(job) = self.session.jobs().get(id) else {
+            self.confirm_remove = None;
+            return;
+        };
+        let title = job_title(job, lang);
+        let modal = egui::Modal::new(egui::Id::new("remove-dictation")).show(ctx, |ui| {
+            ui.set_max_width(360.0);
+            remove_controls(ui, lang, true, &title)
+        });
+        match modal.inner {
+            RemoveRequest::Confirm => self.remove_dictation(id),
+            RemoveRequest::Cancel => self.confirm_remove = None,
+            RemoveRequest::Ask | RemoveRequest::None => {
+                if modal.should_close() {
+                    self.confirm_remove = None;
+                }
+            }
+        }
     }
 
     fn save(&mut self) {
@@ -230,6 +296,8 @@ impl App {
                 (Key::F10, _) => self.copy_timestamp(ctx),
                 (Key::B, true) => self.bookmark(),
                 (Key::S, true) => self.save(),
+                // Escape answers the removal question the safe way.
+                (Key::Escape, false) if self.confirm_remove.is_some() => self.confirm_remove = None,
                 _ => {}
             }
         }
@@ -345,24 +413,37 @@ impl App {
         }
         let mut open = None;
         let mut shown = 0usize;
+        let mut menu: Option<(u64, job_list::RowAction)> = None;
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             for row in &rows {
                 if !self.filter.matches(row.status) {
                     continue;
                 }
                 shown += 1;
-                if job_list::row(ui, row, open_id == Some(row.id), lang).clicked() && opens_on_click(row.id, open_id) {
+                let response = job_list::row(ui, row, open_id == Some(row.id), lang);
+                if response.clicked() && opens_on_click(row.id, open_id) {
                     open = Some(row.id);
                 }
+                // Right click: flag it completed (or back to do), or remove it from the list.
+                response.context_menu(|ui| {
+                    if let Some(action) = job_list::row_menu(ui, row, lang) {
+                        menu = Some((row.id, action));
+                    }
+                });
                 ui.add_space(2.0);
             }
         });
+        if let Some((id, action)) = menu {
+            self.row_action(id, action);
+        }
         if shown == 0 {
             ui.add_space(6.0);
             ui.label(i18n::fill(Text::NothingUnder.in_lang(lang), &[("{filter}", self.filter.label(lang)), ("{all}", Filter::All.label(lang))]));
         }
         if let Some(id) = open {
-            self.open_and_play(id);
+            // Selecting a recording only brings it into the transport: the transcriptionist
+            // starts it with Play (or the pedal), so opening a job never surprises the room.
+            self.open(id);
         }
     }
 
@@ -440,6 +521,7 @@ impl App {
         let mut job = job.clone();
         let before = job.clone();
         let mut jump = None;
+        let mut remove = RemoveRequest::None;
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 3.0;
             ui.horizontal(|ui| {
@@ -505,6 +587,10 @@ impl App {
                     ui.label(egui::RichText::new(&b.label).size(12.5).color(theme::muted()));
                 });
             }
+            ui.add_space(6.0);
+            ui.separator();
+            ui.add_space(4.0);
+            remove = remove_controls(ui, lang, self.confirm_remove == Some(id), &job_title(&job, lang));
         });
         if let Some(ms) = jump {
             self.with_transport(|t| t.seek_ms(ms));
@@ -517,6 +603,12 @@ impl App {
         // Field by field: a bookmark added above this frame must not be overwritten by the copy.
         if edited && let Ok(d) = self.session.jobs_mut().get_mut(id) {
             apply_edits(d, &job);
+        }
+        match remove {
+            RemoveRequest::None => {}
+            RemoveRequest::Ask => self.confirm_remove = Some(id),
+            RemoveRequest::Confirm => self.remove_dictation(id),
+            RemoveRequest::Cancel => self.confirm_remove = None,
         }
     }
 
@@ -616,6 +708,7 @@ impl eframe::App for App {
                 self.settings_row(ui);
             });
         });
+        self.remove_window(ctx);
         // Keep the clock moving while sound plays.
         if self.with_transport(|t| t.state() != State::Stopped).unwrap_or(false) {
             ctx.request_repaint_after(Duration::from_millis(50));
@@ -686,6 +779,47 @@ fn bookmark_controls(ui: &mut egui::Ui, lang: Lang, label: &mut String) -> Bookm
     request
 }
 
+/// What the details card asks about the open dictation's place in the queue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RemoveRequest {
+    None,
+    /// The button was pressed: ask before throwing the row away.
+    Ask,
+    /// The question was answered: remove the dictation from the list.
+    Confirm,
+    /// The question was answered the other way.
+    Cancel,
+}
+
+/// The "remove from list" button and the question it asks before anything is thrown away.
+/// One click only asks: the recording file is never deleted, and the job list changes only
+/// after the transcriptionist confirms.
+fn remove_controls(ui: &mut egui::Ui, lang: Lang, asking: bool, title: &str) -> RemoveRequest {
+    let danger = |text: &str| {
+        egui::Button::new(egui::RichText::new(text).color(theme::red()))
+            .fill(theme::card())
+            .stroke(egui::Stroke::new(1.0, theme::red()))
+            .corner_radius(8)
+    };
+    if !asking {
+        let button = danger(Text::RemoveDictation.in_lang(lang));
+        return if ui.add(button).on_hover_text(Text::RemoveHint.in_lang(lang)).clicked() { RemoveRequest::Ask } else { RemoveRequest::None };
+    }
+    ui.label(egui::RichText::new(i18n::remove_question(title, lang)).size(13.0).color(theme::text()));
+    ui.label(egui::RichText::new(Text::RemoveKeepsFile.in_lang(lang)).size(12.0).color(theme::muted()));
+    let mut request = RemoveRequest::None;
+    // Wrapped, so a translation with longer labels grows downwards instead of widening the panel.
+    ui.horizontal_wrapped(|ui| {
+        if ui.add(danger(Text::RemoveConfirm.in_lang(lang))).clicked() {
+            request = RemoveRequest::Confirm;
+        }
+        if ui.button(Text::Cancel.in_lang(lang)).clicked() {
+            request = RemoveRequest::Cancel;
+        }
+    });
+    request
+}
+
 /// One field in the details card: the label keeps a fixed column so the widgets line up.
 fn detail_row(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
     ui.horizontal(|ui| {
@@ -710,9 +844,15 @@ fn status_pill(ui: &mut egui::Ui, status: Status, lang: Lang) {
     });
 }
 
-/// A click on a queue row switches to it; a click on the open row must not restart it.
+/// A click on a queue row brings it into the transport; it is never started by the click, and
+/// clicking the row that is already open changes nothing.
 fn opens_on_click(clicked: u64, open: Option<u64>) -> bool {
     open != Some(clicked)
+}
+
+/// The title a message uses for a dictation: never an empty pair of quotes.
+fn job_title(job: &Dictation, lang: Lang) -> String {
+    if job.title.trim().is_empty() { Text::Untitled.in_lang(lang).to_owned() } else { job.title.trim().to_owned() }
 }
 
 /// Copies the edited fields back, leaving bookmarks, the path and the saved position alone.
@@ -892,6 +1032,7 @@ mod tests {
                                 }
                                 ui.separator();
                                 let _ = bookmark_controls(ui, lang, &mut field);
+                                let _ = remove_controls(ui, lang, true, "Cardiology follow-up");
                                 frame = Some((panel.width(), ui.min_rect().right(), panel.right()));
                             });
                         });
@@ -914,13 +1055,120 @@ mod tests {
         }
     }
 
-    /// A click on a queue row switches to it and starts it; a click on the row that is already
-    /// open must not restart the audio from the saved position.
+    /// The right-click menu flags a dictation completed or back to do; removing only asks.
     #[test]
-    fn clicking_a_row_opens_it_but_the_open_row_is_not_restarted() {
+    fn the_row_menu_flags_completed_or_back_to_do_and_removing_only_asks() {
+        use job_list::RowAction;
+        assert_eq!(RowAction::MarkDone.status(), Some(Status::Done));
+        assert_eq!(RowAction::MarkToDo.status(), Some(Status::InProgress));
+        assert_eq!(RowAction::Remove.status(), None, "removing goes through the confirmation, not a status");
+        assert_eq!(i18n::marked("Referto", true, Lang::Italiano), "«Referto» segnata come completata");
+        assert_eq!(i18n::marked("Referto", false, Lang::Italiano), "«Referto» riportata tra le da fare");
+        assert_eq!(i18n::marked("Note", true, Lang::English), "“Note” marked as completed");
+    }
+
+    /// The menu offers "mark as completed" on work to do and "back to do" on finished work,
+    /// and always the removal, which never removes on its own.
+    #[test]
+    fn the_row_menu_offers_the_right_status_change() {
+        use job_list::{Row, row_menu};
+        let ctx = egui::Context::default();
+        theme::apply(&ctx, Theme::Dark);
+        let texts = |status: Status| {
+            let row = Row { id: 1, title: "Note".into(), author: String::new(), priority: Priority::Normal, status, duration_ms: None };
+            let input =
+                egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(320.0, 300.0))), ..Default::default() };
+            let mut picked = None;
+            let mut out = ctx.run_ui(input, |ui| picked = row_menu(ui, &row, Lang::Italiano));
+            out.textures_delta.clear();
+            assert_eq!(picked, None, "drawing the menu must not act");
+            out.shapes
+                .iter()
+                .filter_map(|s| match &s.shape {
+                    egui::Shape::Text(t) => Some(t.galley.text().to_owned()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        let open = texts(Status::InProgress);
+        assert!(open.iter().any(|t| t == "Segna come completata"), "{open:?}");
+        assert!(open.iter().any(|t| t == "Rimuovi dalla coda…"), "{open:?}");
+        let done = texts(Status::Done);
+        assert!(done.iter().any(|t| t == "Riporta tra le da fare"), "{done:?}");
+        assert!(!done.iter().any(|t| t == "Segna come completata"), "{done:?}");
+    }
+
+    /// A click on a queue row brings it into the transport without starting playback; a click
+    /// on the row that is already open changes nothing.
+    #[test]
+    fn clicking_a_row_opens_it_but_does_not_start_it() {
         assert!(opens_on_click(2, Some(1)), "another job must open");
         assert!(opens_on_click(1, None), "the first job must open");
-        assert!(!opens_on_click(1, Some(1)), "the open job must keep playing");
+        assert!(!opens_on_click(1, Some(1)), "the open job must keep its place and its position");
+    }
+
+    /// One frame of the remove controls: the request it produced and the rectangles of the
+    /// buttons it painted, left to right.
+    fn draw_remove(ctx: &egui::Context, lang: Lang, asking: bool, events: Vec<egui::Event>) -> (RemoveRequest, Vec<egui::Rect>) {
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(320.0, 420.0));
+        let input = egui::RawInput { screen_rect: Some(screen), events, ..Default::default() };
+        let mut request = RemoveRequest::None;
+        let mut output = ctx.run_ui(input, |ui| {
+            request = remove_controls(ui, lang, asking, "Cardiology follow-up");
+        });
+        let mut rects: Vec<egui::Rect> = output
+            .shapes
+            .iter()
+            .filter_map(|s| match &s.shape {
+                egui::Shape::Rect(r) if r.stroke.width > 0.0 && r.rect.height() > 16.0 => Some(r.rect),
+                _ => None,
+            })
+            .collect();
+        output.textures_delta.clear();
+        rects.sort_by(|a, b| a.left().total_cmp(&b.left()));
+        (request, rects)
+    }
+
+    fn click_at(pos: egui::Pos2) -> Vec<egui::Event> {
+        vec![
+            egui::Event::PointerMoved(pos),
+            egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::default() },
+            egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed: false, modifiers: egui::Modifiers::default() },
+        ]
+    }
+
+    /// Removing is never one click: the button only asks, Cancel keeps the job, and only the
+    /// confirmation asks `details` to remove it. The recording file is never part of the
+    /// question, because it is never touched.
+    #[test]
+    fn removing_a_dictation_asks_first_and_can_be_cancelled() {
+        let ctx = egui::Context::default();
+        theme::apply(&ctx, Theme::Dark);
+        assert_eq!(draw_remove(&ctx, Lang::English, false, Vec::new()).0, RemoveRequest::None, "the button alone removes nothing");
+        let (_, rects) = draw_remove(&ctx, Lang::English, false, Vec::new());
+        assert_eq!(rects.len(), 1, "one button before the question: {rects:?}");
+        let (asked, _) = draw_remove(&ctx, Lang::English, false, click_at(rects[0].center()));
+        assert_eq!(asked, RemoveRequest::Ask, "a click on the button must ask, not remove");
+
+        let (_, rects) = draw_remove(&ctx, Lang::English, true, Vec::new());
+        assert_eq!(rects.len(), 2, "Remove and Cancel while the question is shown: {rects:?}");
+        let (cancelled, _) = draw_remove(&ctx, Lang::English, true, click_at(rects[1].center()));
+        assert_eq!(cancelled, RemoveRequest::Cancel, "Cancel throws nothing away");
+        let (confirmed, _) = draw_remove(&ctx, Lang::English, true, click_at(rects[0].center()));
+        assert_eq!(confirmed, RemoveRequest::Confirm, "only the confirmation removes the job");
+    }
+
+    /// The removal wording names the dictation, and an untitled file is never quoted as an
+    /// empty name.
+    #[test]
+    fn the_removal_wording_names_the_dictation_in_both_languages() {
+        assert_eq!(i18n::remove_question("Referto", Lang::Italiano), "Rimuovere «Referto» dalla coda?");
+        assert_eq!(i18n::removed("Referto", Lang::Italiano), "«Referto» rimossa dalla coda");
+        assert_eq!(i18n::removed("Dictation", Lang::English), "removed “Dictation” from the list");
+        let blank = Dictation { title: "   ".into(), ..Default::default() };
+        assert_eq!(job_title(&blank, Lang::Italiano), Text::Untitled.in_lang(Lang::Italiano));
+        let named = Dictation { title: "  Referto  ".into(), ..Default::default() };
+        assert_eq!(job_title(&named, Lang::English), "Referto");
     }
 
     #[test]

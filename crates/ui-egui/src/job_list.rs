@@ -186,6 +186,50 @@ pub(crate) fn row(ui: &mut egui::Ui, row: &Row, open: bool, lang: Lang) -> egui:
     response
 }
 
+/// What the right-click menu on a queue row asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RowAction {
+    /// Flag the dictation as completed.
+    MarkDone,
+    /// Put a completed dictation back among the work to do.
+    MarkToDo,
+    /// Remove it from the list (after a confirmation; the recording file stays).
+    Remove,
+}
+
+impl RowAction {
+    /// The status a dictation gets from this action, if it changes the status.
+    pub(crate) fn status(self) -> Option<Status> {
+        match self {
+            RowAction::MarkDone => Some(Status::Done),
+            RowAction::MarkToDo => Some(Status::InProgress),
+            RowAction::Remove => None,
+        }
+    }
+}
+
+/// The right-click menu of a queue row: flag it completed (or back to do), or remove it.
+pub(crate) fn row_menu(ui: &mut egui::Ui, row: &Row, lang: Lang) -> Option<RowAction> {
+    let mut action = None;
+    let finished = matches!(row.status, Status::Done | Status::Dispatched);
+    if finished {
+        if ui.button(Text::MarkToDo.in_lang(lang)).clicked() {
+            action = Some(RowAction::MarkToDo);
+        }
+    } else if ui.button(Text::MarkDone.in_lang(lang)).clicked() {
+        action = Some(RowAction::MarkDone);
+    }
+    ui.separator();
+    if ui.button(egui::RichText::new(Text::RemoveDictation.in_lang(lang)).color(theme::red())).on_hover_text(Text::RemoveHint.in_lang(lang)).clicked()
+    {
+        action = Some(RowAction::Remove);
+    }
+    if action.is_some() {
+        ui.close();
+    }
+    action
+}
+
 /// Lays out `text` on one row, eliding it with an ellipsis past `max_width`.
 fn one_line(painter: &egui::Painter, text: &str, font: FontId, colour: Color32, max_width: f32) -> std::sync::Arc<egui::Galley> {
     let mut job = egui::text::LayoutJob::single_section(text.to_owned(), egui::TextFormat { font_id: font, color: colour, ..Default::default() });
