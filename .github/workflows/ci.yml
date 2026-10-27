@@ -1,8 +1,9 @@
 name: ci
 
 on:
+  # Every pull request, also stacked ones whose base is another feature branch: with a
+  # `branches: [main]` filter those were merged without any check.
   pull_request:
-    branches: [main]
   push:
     branches: [main]
 

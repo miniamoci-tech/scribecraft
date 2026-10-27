@@ -26,7 +26,33 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # The packages are named after [workspace.package] version in Cargo.toml, not after the
+  # tag. A tag that does not say exactly "v" + that version (v.0.1.3 for 0.1.2 did) would
+  # publish files with the wrong number, so a tagged run stops here first and says how to
+  # fix it. A manual run (workflow_dispatch) is not checked.
+  version:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches the Cargo.toml version
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+          if [ -z "$version" ]; then
+            echo "::error::no version = \"...\" line found in Cargo.toml"
+            exit 1
+          fi
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error::tag $TAG does not match Cargo.toml version $version. Set [workspace.package] version (and the internal crates' versions) to the release number, commit, then tag exactly v<version>, e.g. v$version."
+            exit 1
+          fi
+          echo "tag $TAG matches Cargo.toml version $version"
+
   windows:
+    needs: version
     runs-on: windows-2022
     timeout-minutes: 60
     steps:
@@ -43,6 +69,7 @@ jobs:
             dist/*-setup.exe
 
   macos:
+    needs: version
     # macos-14 e' dismesso dal 2 novembre 2026.
     # Su un tag non esistono input, quindi il default resta macos-15.
     runs-on: ${{ inputs.macos_runner || 'macos-15' }}
@@ -59,6 +86,7 @@ jobs:
           path: dist/*.dmg
 
   linux:
+    needs: version
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:

@@ -2982,14 +2982,14 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "scribecraft"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "scribecraft-ui-egui",
 ]
 
 [[package]]
 name = "scribecraft-automation"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "scribecraft-engine",
  "serde",
@@ -2999,7 +2999,7 @@ dependencies = [
 
 [[package]]
 name = "scribecraft-cli"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "scribecraft-automation",
  "scribecraft-engine",
@@ -3009,14 +3009,14 @@ dependencies = [
 
 [[package]]
 name = "scribecraft-dsp"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "proptest",
 ]
 
 [[package]]
 name = "scribecraft-engine"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "log",
  "proptest",
@@ -3029,7 +3029,7 @@ dependencies = [
 
 [[package]]
 name = "scribecraft-media"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "hound",
  "proptest",
@@ -3039,7 +3039,7 @@ dependencies = [
 
 [[package]]
 name = "scribecraft-platform"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "cpal",
  "global-hotkey",
@@ -3052,7 +3052,7 @@ dependencies = [
 
 [[package]]
 name = "scribecraft-transport"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "proptest",
  "scribecraft-dsp",
@@ -3063,7 +3063,7 @@ dependencies = [
 
 [[package]]
 name = "scribecraft-ui-egui"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "dispatch2",
  "eframe",
@@ -4654,7 +4654,7 @@ checksum = "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7"
 
 [[package]]
 name = "xtask"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "serde",
  "serde_json",
