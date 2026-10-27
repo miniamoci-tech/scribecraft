@@ -49,6 +49,7 @@ ScribeCraft is a clean-room, open-source, Rust-native transcription player targe
 - `cargo xtask parity [--partial]` reports Express Scribe parity from `parity/express-scribe-features.toml`. Update the entry when a feature ships.
 - `cargo run --release -p scribecraft [file…]` opens the desktop app; set `SCRIBECRAFT_DATA_DIR` to a scratch folder when testing so the user's real job list is never touched.
 - `cargo xtask dist` packages for the current OS (Windows zip + Inno Setup installer, macOS .app + .dmg, Linux tar.gz); `.github/workflows/release.yml` builds all three.
+- **Releasing:** set `[workspace.package] version` and the internal crates' `version` in the root `Cargo.toml` to the new number, merge that into `main`, then tag exactly `v<version>` (e.g. `v0.1.4`, never `v.0.1.4`). Package names come from `Cargo.toml`, not from the tag; the release workflow's `version` job refuses a tag that does not match.
 - Windows: deep checkouts exceed MAX_PATH for the MSVC linker; build with a short `CARGO_TARGET_DIR` (e.g. `C:\sct`) and `git config core.longpaths true`.
 - Parallel agents: use a separate `CARGO_TARGET_DIR` per agent and separate git worktrees.
 

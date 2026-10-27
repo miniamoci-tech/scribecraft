@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/*", "apps/*", "xtask"]
 
 [workspace.package]
-version = "0.1.2"
+version = "0.1.4"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.95"
@@ -11,13 +11,13 @@ repository = "https://github.com/miniamoci-tech/scribecraft"
 
 [workspace.dependencies]
 # internal
-scribecraft-dsp = { path = "crates/dsp", version = "0.1.2" }
-scribecraft-media = { path = "crates/media", version = "0.1.2" }
-scribecraft-transport = { path = "crates/transport", version = "0.1.2" }
-scribecraft-engine = { path = "crates/engine", version = "0.1.2" }
-scribecraft-automation = { path = "crates/automation", version = "0.1.2" }
-scribecraft-platform = { path = "crates/platform", version = "0.1.2", default-features = false }
-scribecraft-ui-egui = { path = "crates/ui-egui", version = "0.1.2" }
+scribecraft-dsp = { path = "crates/dsp", version = "0.1.4" }
+scribecraft-media = { path = "crates/media", version = "0.1.4" }
+scribecraft-transport = { path = "crates/transport", version = "0.1.4" }
+scribecraft-engine = { path = "crates/engine", version = "0.1.4" }
+scribecraft-automation = { path = "crates/automation", version = "0.1.4" }
+scribecraft-platform = { path = "crates/platform", version = "0.1.4", default-features = false }
+scribecraft-ui-egui = { path = "crates/ui-egui", version = "0.1.4" }
 
 # media (pure Rust decoders; MPL-2.0, used unmodified as a dependency)
 symphonia = { version = "0.5.4", default-features = false, features = ["wav", "pcm", "adpcm", "mp3", "flac", "vorbis", "ogg", "aac", "isomp4", "aiff", "caf", "alac", "mkv"] }
